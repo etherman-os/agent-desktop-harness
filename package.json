@@ -1,0 +1,44 @@
+{
+  "name": "agent-desktop-harness",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Linux-first GUI QA and visual handoff harness for coding agents.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@9.0.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/etherman-os/agent-desktop-harness.git"
+  },
+  "keywords": [
+    "agent",
+    "gui",
+    "qa",
+    "xvfb",
+    "mcp",
+    "desktop-automation",
+    "visual-testing",
+    "evidence"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm --filter @agent-desktop-harness/core test && pnpm --filter @agent-desktop-harness/cli test && pnpm --filter @agent-desktop-harness/mcp-server test && pnpm --filter @agent-desktop-harness/http-server test",
+    "smoke:x11": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-x11",
+    "smoke:http": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-http",
+    "smoke:mcp": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-mcp",
+    "smoke:vite:http": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-vite-http",
+    "smoke:vite:mcp": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-vite-mcp",
+    "smoke:vite": "pnpm smoke:vite:http && pnpm smoke:vite:mcp",
+    "smoke:annotation-repair": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-annotation-repair-demo",
+    "smoke:all": "pnpm smoke:x11 && pnpm smoke:http && pnpm smoke:mcp"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "@agent-desktop-harness/core",
+  "version": "0.0.0",
+  "description": "Core engine for isolated desktop sessions, evidence, input, screenshots, and visual handoff.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/etherman-os/agent-desktop-harness.git",
+    "directory": "packages/core"
+  },
+  "keywords": ["agent", "gui", "qa", "xvfb", "evidence"],
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "echo \"No lint configured yet for @agent-desktop-harness/core\"",
+    "test": "pnpm build && node --test dist/session/displayAllocator.test.js dist/policy/PolicyValidator.test.js dist/evidence/EvidenceStore.test.js dist/input/XdotoolInputBackend.test.js dist/window/WmctrlWindowBackend.test.js dist/session/SessionManager.input.test.js"
+  }
+}

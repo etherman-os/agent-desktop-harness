@@ -1,0 +1,46 @@
+name: Visual handoff bug
+description: Report a GUI issue using visual evidence or annotation output.
+title: "[Visual Handoff]: "
+labels:
+  - visual-handoff
+  - bug
+body:
+  - type: input
+    id: evidence_path
+    attributes:
+      label: Screenshot or evidence path
+      placeholder: .desktop-harness/sessions/<sessionId>/visual-handoff.md
+    validations:
+      required: true
+  - type: textarea
+    id: annotation_note
+    attributes:
+      label: Annotation note
+      description: Human note from the annotation or a short description of the marked issue.
+    validations:
+      required: true
+  - type: textarea
+    id: expected_ui
+    attributes:
+      label: Expected UI
+    validations:
+      required: true
+  - type: textarea
+    id: actual_ui
+    attributes:
+      label: Actual UI
+    validations:
+      required: true
+  - type: dropdown
+    id: app_type
+    attributes:
+      label: App type
+      options:
+        - web
+        - Electron
+        - Tauri
+        - native Linux GUI
+        - game
+        - other
+    validations:
+      required: true

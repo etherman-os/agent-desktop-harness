@@ -1,0 +1,37 @@
+{
+  "name": "@agent-desktop-harness/mcp-server",
+  "version": "0.0.0",
+  "description": "MCP stdio server adapter for agent-desktop-harness.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/etherman-os/agent-desktop-harness.git",
+    "directory": "packages/mcp-server"
+  },
+  "keywords": ["agent", "gui", "qa", "xvfb", "mcp"],
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "pnpm --filter @agent-desktop-harness/core build >/dev/null && tsc -p tsconfig.json --pretty false >/dev/null && node dist/index.js",
+    "start": "node dist/index.js",
+    "build": "pnpm --filter @agent-desktop-harness/core build && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "echo \"No lint configured yet for @agent-desktop-harness/mcp-server\"",
+    "test": "pnpm build && node --test dist/schemas.test.js dist/toolHandlers.test.js"
+  },
+  "dependencies": {
+    "@agent-desktop-harness/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
+  }
+}

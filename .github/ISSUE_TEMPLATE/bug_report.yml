@@ -1,0 +1,46 @@
+name: Bug report
+description: Report a problem with Agent Desktop Harness.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node version, pnpm version, browser if relevant, and installed GUI dependencies.
+      placeholder: Ubuntu version, Node version, pnpm version, browser, Xvfb/scrot/xdotool/wmctrl status.
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command run
+      description: The exact command or API call that failed.
+      placeholder: pnpm smoke:http
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Paste relevant logs. Remove secrets and private data.
+      render: text
+  - type: input
+    id: evidence
+    attributes:
+      label: Evidence path
+      description: Session evidence path if relevant.
+      placeholder: .desktop-harness/sessions/<sessionId>

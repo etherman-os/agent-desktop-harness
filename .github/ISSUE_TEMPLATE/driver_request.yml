@@ -1,0 +1,38 @@
+name: Driver request
+description: Request or discuss a semantic driver.
+title: "[Driver]: "
+labels:
+  - driver
+  - enhancement
+body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Target platform
+      options:
+        - web
+        - Tauri
+        - Electron
+        - native
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: desired_behavior
+    attributes:
+      label: Desired driver behavior
+      description: What should the driver inspect, click, type, assert, or report?
+    validations:
+      required: true
+  - type: textarea
+    id: fallback
+    attributes:
+      label: Fallback expectations
+      description: What should happen when the semantic driver is unavailable?
+    validations:
+      required: true
+  - type: textarea
+    id: links
+    attributes:
+      label: Framework docs or references
+      description: Links to official docs, driver APIs, or target app details.
