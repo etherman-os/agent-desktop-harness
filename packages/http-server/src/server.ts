@@ -75,6 +75,22 @@ async function routeRequest(
     return ok(api.health());
   }
 
+  if (method === "GET" && parts.length === 2 && parts[0] === "tauri" && parts[1] === "status") {
+    return ok(await api.tauriStatus());
+  }
+
+  if (method === "GET" && parts.length === 2 && parts[0] === "electron" && parts[1] === "status") {
+    return ok(await api.electronStatus());
+  }
+
+  if (method === "GET" && parts.length === 2 && parts[0] === "drivers" && parts[1] === "status") {
+    return ok(await api.driverStatus());
+  }
+
+  if (method === "GET" && parts.length === 2 && parts[0] === "observer" && parts[1] === "status") {
+    return ok(await api.observerStatus());
+  }
+
   if (parts[0] !== "sessions") {
     throw new HttpError(404, "NOT_FOUND", "Route not found.");
   }
@@ -100,6 +116,20 @@ async function routeRequest(
     return ok(await api.stopSession(sessionId));
   }
 
+  if (parts.length === 3 && parts[2] === "observers") {
+    if (method === "GET") {
+      return ok(api.listLiveObservers(sessionId));
+    }
+
+    if (method === "POST") {
+      return ok(await api.startLiveObserver(sessionId, await readJsonBody(request)));
+    }
+  }
+
+  if (method === "DELETE" && parts.length === 4 && parts[2] === "observers") {
+    return ok(await api.stopLiveObserver(sessionId, parts[3] ?? ""));
+  }
+
   if (method === "POST" && parts.length === 3) {
     const action = parts[2];
     const body = await readJsonBody(request);
@@ -123,11 +153,152 @@ async function routeRequest(
         return ok(await api.focusWindow(sessionId, body));
       case "wait-for-stable-screen":
         return ok(await api.waitForStableScreen(sessionId, body));
+      case "wait-for-window":
+        return ok(await api.waitForWindow(sessionId, body));
       case "annotations":
         return ok(await api.createAnnotation(sessionId, body));
       default:
         throw new HttpError(404, "NOT_FOUND", "Route not found.");
     }
+  }
+
+  if (method === "POST" && parts.length === 4 && parts[2] === "browser") {
+    const action = parts[3];
+    const body = await readJsonBody(request);
+
+    switch (action) {
+      case "open":
+        return ok(await api.browserOpen(sessionId, body));
+      case "click":
+        return ok(await api.browserClick(sessionId, body));
+      case "fill":
+        return ok(await api.browserFill(sessionId, body));
+      case "press":
+        return ok(await api.browserPress(sessionId, body));
+      case "assert-text":
+        return ok(await api.browserAssertText(sessionId, body));
+      case "screenshot":
+        return ok(await api.browserScreenshot(sessionId, body));
+      case "close":
+        return ok(await api.browserClose(sessionId, body));
+      default:
+        throw new HttpError(404, "NOT_FOUND", "Route not found.");
+    }
+  }
+
+  if (method === "POST" && parts.length === 4 && parts[2] === "tauri") {
+    const action = parts[3];
+    const body = await readJsonBody(request);
+
+    switch (action) {
+      case "open":
+        return ok(await api.tauriOpen(sessionId, body));
+      case "click":
+        return ok(await api.tauriClick(sessionId, body));
+      case "fill":
+        return ok(await api.tauriFill(sessionId, body));
+      case "assert-text":
+        return ok(await api.tauriAssertText(sessionId, body));
+      case "screenshot":
+        return ok(await api.tauriScreenshot(sessionId, body));
+      case "close":
+        return ok(await api.tauriClose(sessionId, body));
+      default:
+        throw new HttpError(404, "NOT_FOUND", "Route not found.");
+    }
+  }
+
+  if (method === "POST" && parts.length === 4 && parts[2] === "electron") {
+    const action = parts[3];
+    const body = await readJsonBody(request);
+
+    switch (action) {
+      case "open":
+        return ok(await api.electronOpen(sessionId, body));
+      case "click":
+        return ok(await api.electronClick(sessionId, body));
+      case "fill":
+        return ok(await api.electronFill(sessionId, body));
+      case "press":
+        return ok(await api.electronPress(sessionId, body));
+      case "assert-text":
+        return ok(await api.electronAssertText(sessionId, body));
+      case "screenshot":
+        return ok(await api.electronScreenshot(sessionId, body));
+      case "close":
+        return ok(await api.electronClose(sessionId, body));
+      default:
+        throw new HttpError(404, "NOT_FOUND", "Route not found.");
+    }
+  }
+
+  if (method === "POST" && parts.length === 4 && parts[2] === "driver" && parts[3] === "route") {
+    return ok(await api.driverRoute(sessionId, await readJsonBody(request)));
+  }
+
+  if (method === "POST" && parts.length === 4 && parts[2] === "apps") {
+    const action = parts[3];
+    const body = await readJsonBody(request);
+
+    switch (action) {
+      case "open":
+        return ok(await api.appOpen(sessionId, body));
+      case "click":
+        return ok(await api.appClick(sessionId, body));
+      case "fill":
+        return ok(await api.appFill(sessionId, body));
+      case "press":
+        return ok(await api.appPress(sessionId, body));
+      case "assert-text":
+        return ok(await api.appAssertText(sessionId, body));
+      case "screenshot":
+        return ok(await api.appScreenshot(sessionId, body));
+      case "close":
+        return ok(await api.appClose(sessionId, body));
+      default:
+        throw new HttpError(404, "NOT_FOUND", "Route not found.");
+    }
+  }
+
+  if (method === "POST" && parts.length === 4 && parts[2] === "visual") {
+    const action = parts[3];
+    const body = await readJsonBody(request);
+
+    switch (action) {
+      case "baselines":
+        return ok(await api.saveVisualBaseline(sessionId, body));
+      case "compare":
+        return ok(await api.visualCompare(sessionId, body));
+      case "assert-changed":
+        return ok(await api.visualAssertChanged(sessionId, body));
+      case "assert-similar":
+        return ok(await api.visualAssertSimilar(sessionId, body));
+      case "compare-baseline":
+        return ok(await api.compareVisualBaseline(sessionId, body));
+      case "assert-annotation-changed":
+        return ok(await api.visualAssertAnnotationChanged(sessionId, body));
+      case "assert-annotation-similar":
+        return ok(await api.visualAssertAnnotationSimilar(sessionId, body));
+      case "assert-change-contained":
+        return ok(await api.visualAssertChangeContained(sessionId, body));
+      default:
+        throw new HttpError(404, "NOT_FOUND", "Route not found.");
+    }
+  }
+
+  if (method === "GET" && parts.length === 4 && parts[2] === "visual" && parts[3] === "baselines") {
+    return ok(await api.listVisualBaselines(sessionId, Object.fromEntries(url.searchParams)));
+  }
+
+  if (method === "GET" && parts.length === 4 && parts[2] === "visual" && parts[3] === "assertions") {
+    return ok(await api.listVisualAssertions(sessionId));
+  }
+
+  if (method === "GET" && parts.length === 5 && parts[2] === "visual" && parts[3] === "diffs") {
+    const file = await api.getVisualDiffFile(sessionId, parts[4] ?? "");
+    return binary(200, file.body, "image/png", {
+      "content-disposition": `inline; filename="${safeHeaderFileName(parts[4] ?? "visual-diff.png")}"`
+    });
   }
 
   if (method === "GET" && parts.length === 3 && parts[2] === "windows") {

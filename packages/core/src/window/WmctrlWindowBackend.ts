@@ -13,6 +13,7 @@ import {
 import type { CommandRunner, DependencyChecker } from "../utils/command.js";
 import { isoNow } from "../utils/time.js";
 import type { WindowBackend } from "./types.js";
+import { findBestWindow, filterWindows } from "./windowFilters.js";
 
 export interface WmctrlWindowBackendOptions {
   readonly commandRunner?: CommandRunner;
@@ -30,7 +31,7 @@ export class WmctrlWindowBackend implements WindowBackend {
 
   async getWindows(session: DesktopSession): Promise<WindowInfo[]> {
     await this.ensureWmctrl();
-    const result = await this.commandRunner("wmctrl", ["-lp"], {
+    const result = await this.commandRunner("wmctrl", ["-lG", "-p"], {
       env: createSanitizedEnvironment({ DISPLAY: session.display })
     });
 
@@ -78,6 +79,26 @@ export function parseWmctrlWindowList(stdout: string): WindowInfo[] {
 }
 
 export function parseWmctrlLine(line: string): WindowInfo {
+  const geometryMatch =
+    /^(\S+)\s+(\S+)\s+(-?\d+)\s+(-?\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s*(.*)$/.exec(line);
+
+  if (geometryMatch) {
+    const [, id, desktop, pidValue, xValue, yValue, widthValue, heightValue, , rest] =
+      geometryMatch;
+    const pid = Number.parseInt(pidValue, 10);
+    return {
+      id,
+      desktop,
+      pid: Number.isFinite(pid) && pid >= 0 ? pid : undefined,
+      x: parseOptionalInteger(xValue),
+      y: parseOptionalInteger(yValue),
+      width: parseOptionalInteger(widthValue),
+      height: parseOptionalInteger(heightValue),
+      title: rest,
+      raw: line
+    };
+  }
+
   const match = /^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*(.*)$/.exec(line);
 
   if (!match) {
@@ -110,17 +131,21 @@ export function findMatchingWindow(
   }
 
   if (target.pid !== undefined) {
-    return windows.find((window) => window.pid === target.pid);
+    return findBestWindow(windows, target);
   }
 
   if (target.title) {
-    return windows.find((window) => window.title === target.title);
+    return filterWindows(windows, target).find((window) => window.title === target.title);
   }
 
   if (target.titleIncludes) {
-    const needle = target.titleIncludes.toLowerCase();
-    return windows.find((window) => window.title.toLowerCase().includes(needle));
+    return findBestWindow(windows, target);
   }
 
   throw new ProcessError("focusWindow requires id, pid, title, or titleIncludes.");
+}
+
+function parseOptionalInteger(value: string): number | undefined {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }

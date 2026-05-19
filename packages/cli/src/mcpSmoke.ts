@@ -73,6 +73,7 @@ export async function runSmokeMcp(
     await client.assertTools([
       "desktop_start_session",
       "desktop_launch_app",
+      "desktop_wait_for_window",
       "desktop_wait_for_stable_screen",
       "desktop_screenshot",
       "desktop_get_windows",
@@ -107,7 +108,10 @@ export async function runSmokeMcp(
         timeoutMs: 5000,
         intervalMs: 500,
         stableChecks: 1,
-        label: "mcp-smoke-stable"
+        label: "mcp-smoke-stable",
+        mode: "tolerant",
+        fileSizeToleranceBytes: 2048,
+        retainOnlyLast: true
       }
     );
     const initialScreenshot = await client.callTool<ScreenshotToolResult>(
@@ -117,11 +121,12 @@ export async function runSmokeMcp(
         label: "mcp-smoke-initial"
       }
     );
-    const windows = await waitForMcpWindows(client, sessionId);
-    const targetWindow = windows[0];
-    if (!targetWindow) {
-      throw new Error("MCP smoke could not find a window to focus.");
-    }
+    const targetWindow = await client.callTool<WindowInfo>("desktop_wait_for_window", {
+      sessionId,
+      excludeDevtools: true,
+      preferLargest: true,
+      timeoutMs: 5000
+    });
 
     await client.callTool("desktop_focus_window", {
       sessionId,

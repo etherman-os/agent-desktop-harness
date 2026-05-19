@@ -10,7 +10,7 @@ The core package is `@agent-desktop-harness/core`.
 
 ## Session Manager
 
-The session manager creates, tracks, and stops desktop sessions. For v0.1, each session represents an isolated Xvfb display plus optional launched application processes.
+The session manager creates, tracks, and stops desktop sessions. In the current Linux-first runtime, each session represents an isolated Xvfb display plus optional launched application processes.
 
 Responsibilities:
 
@@ -26,7 +26,7 @@ Responsibilities:
 
 ## Display Backend
 
-The v0.1 display backend is Xvfb. It should run without controlling the user's real desktop. Later backends may support other Linux display systems, but Xvfb remains the first target because it is widely available in CI and agent environments.
+The primary display backend is Xvfb. It should run without controlling the user's real desktop. Later backends may support other Linux display systems, but Xvfb remains the first target because it is widely available in CI and agent environments.
 
 ## Input Backend
 

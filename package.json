@@ -2,7 +2,7 @@
   "name": "agent-desktop-harness",
   "version": "0.0.0",
   "private": true,
-  "description": "Linux-first GUI QA and visual handoff harness for coding agents.",
+  "description": "Linux-first GUI QA and visual handoff cockpit for coding agents.",
   "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@9.0.0",
@@ -35,6 +35,13 @@
     "smoke:vite:mcp": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-vite-mcp",
     "smoke:vite": "pnpm smoke:vite:http && pnpm smoke:vite:mcp",
     "smoke:annotation-repair": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-annotation-repair-demo",
+    "smoke:browser-semantic": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-browser-semantic",
+    "smoke:tauri-driver": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-tauri-driver",
+    "smoke:electron-driver": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-electron-driver",
+    "smoke:driver-router": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-driver-router",
+    "smoke:visual-qa": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-visual-qa",
+    "smoke:visual-baseline": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-visual-baseline",
+    "smoke:observer": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-observer",
     "smoke:all": "pnpm smoke:x11 && pnpm smoke:http && pnpm smoke:mcp"
   },
   "devDependencies": {

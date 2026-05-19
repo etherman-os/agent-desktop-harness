@@ -137,7 +137,10 @@ export async function runSmokeHttp(
           timeoutMs: 5000,
           intervalMs: 500,
           stableChecks: 1,
-          label: "http-smoke-stable"
+          label: "http-smoke-stable",
+          mode: "tolerant",
+          fileSizeToleranceBytes: 2048,
+          retainOnlyLast: true
         }
       }
     );
@@ -151,16 +154,23 @@ export async function runSmokeHttp(
         }
       }
     );
-    const windows = await waitForHttpWindows(fetchLike, baseUrl, sessionId);
-    const targetWindow = windows[0];
-    if (!targetWindow) {
-      throw new Error("HTTP smoke could not find a window to focus.");
-    }
+    const windowResponse = await httpJsonRequest<WaitForWindowResponse>(
+      fetchLike,
+      `${baseUrl}/sessions/${sessionId}/wait-for-window`,
+      {
+        method: "POST",
+        body: {
+          excludeDevtools: true,
+          preferLargest: true,
+          timeoutMs: 5000
+        }
+      }
+    );
 
     await httpJsonRequest(fetchLike, `${baseUrl}/sessions/${sessionId}/focus-window`, {
       method: "POST",
       body: {
-        id: targetWindow.id
+        id: windowResponse.window.id
       }
     });
     await httpJsonRequest(fetchLike, `${baseUrl}/sessions/${sessionId}/click`, {
@@ -442,6 +452,10 @@ interface WaitForStableScreenResponse {
       readonly path: string;
     };
   };
+}
+
+interface WaitForWindowResponse {
+  readonly window: WindowInfo;
 }
 
 interface WindowInfo {

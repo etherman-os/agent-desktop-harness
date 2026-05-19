@@ -4,6 +4,7 @@ import {
   DOCTOR_DEPENDENCIES,
   formatDoctorText,
   formatMissingRequiredMessage,
+  getTauriDriverDependencyStatuses,
   runDoctor,
   type DoctorReport
 } from "./doctor.js";
@@ -31,6 +32,7 @@ test("runDoctor returns machine-readable dependency statuses", async () => {
       path: undefined
     }
   ]);
+  assert.equal(report.experimental?.tauriDriver.available, false);
 });
 
 test("formatDoctorText includes human-readable sections and status", () => {
@@ -62,8 +64,68 @@ test("formatDoctorText includes human-readable sections and status", () => {
         level: "optional",
         installHint: "sudo apt install -y xterm",
         found: false
+      },
+      {
+        name: "tauri-driver",
+        level: "experimental",
+        installHint: "cargo install tauri-driver --locked",
+        found: false
+      },
+      {
+        name: "WebKitWebDriver",
+        level: "experimental",
+        installHint: "Install the WebKit WebDriver package for your distribution; package names vary.",
+        found: false
+      },
+      {
+        name: "cargo",
+        level: "experimental",
+        installHint: "Install Rust and Cargo from your distribution packages or rustup.",
+        found: true,
+        path: "/usr/bin/cargo"
+      },
+      {
+        name: "x11vnc",
+        level: "observer",
+        installHint: "sudo apt install -y x11vnc",
+        found: false
+      },
+      {
+        name: "websockify",
+        level: "observer",
+        installHint: "sudo apt install -y websockify",
+        found: false
+      },
+      {
+        name: "novnc_proxy",
+        level: "observer",
+        installHint: "sudo apt install -y novnc",
+        found: false
       }
-    ]
+    ],
+    experimental: {
+      tauriDriver: {
+        available: false,
+        dependencies: [],
+        warnings: [],
+        errors: ["tauri-driver is missing."]
+      },
+      electronDriver: {
+        available: true,
+        playwrightAvailable: true,
+        electronBinaryPath: "/tmp/node_modules/.bin/electron",
+        warnings: [],
+        errors: []
+      }
+    },
+    optional: {
+      liveObserver: {
+        available: false,
+        warnings: [],
+        errors: ["x11vnc is missing."],
+        installHints: ["sudo apt install -y x11vnc novnc websockify"]
+      }
+    }
   };
 
   const text = formatDoctorText(report);
@@ -74,6 +136,16 @@ test("formatDoctorText includes human-readable sections and status", () => {
   assert.match(text, /scrot\s+MISSING\s+install with: sudo apt install -y scrot/);
   assert.match(text, /Recommended dependencies:/);
   assert.match(text, /Optional smoke dependencies:/);
+  assert.match(text, /Optional live observer dependencies:/);
+  assert.match(text, /x11vnc\s+MISSING/);
+  assert.match(text, /Live observer path: unavailable/);
+  assert.match(text, /Experimental Tauri driver dependencies:/);
+  assert.match(text, /tauri-driver\s+MISSING/);
+  assert.match(text, /Tauri WebDriver semantic path: unavailable/);
+  assert.match(text, /Experimental Electron driver:/);
+  assert.match(text, /playwright electron API: OK/);
+  assert.match(text, /electron binary: OK\s+\/tmp\/node_modules\/\.bin\/electron/);
+  assert.match(text, /Electron Playwright semantic path: available/);
   assert.match(text, /Status: not_ready/);
 });
 
@@ -92,6 +164,29 @@ test("dependency install hints map to the expected Ubuntu packages", () => {
   assert.equal(hints.get("wmctrl"), "sudo apt install -y wmctrl");
   assert.equal(hints.get("openbox"), "sudo apt install -y openbox");
   assert.equal(hints.get("xterm"), "sudo apt install -y xterm");
+  assert.equal(hints.get("tauri-driver"), "cargo install tauri-driver --locked");
+  assert.equal(hints.get("x11vnc"), "sudo apt install -y x11vnc");
+  assert.equal(hints.get("websockify"), "sudo apt install -y websockify");
+  assert.equal(hints.get("novnc_proxy"), "sudo apt install -y novnc");
+});
+
+test("Tauri driver dependencies are experimental and do not block readiness", async () => {
+  const report = await runDoctor(
+    [
+      {
+        name: "tauri-driver",
+        level: "experimental",
+        installHint: "cargo install tauri-driver --locked"
+      }
+    ],
+    { PATH: "" }
+  );
+
+  assert.equal(report.ready, true);
+  assert.equal(report.status, "ready");
+  assert.equal(report.experimental?.tauriDriver.available, false);
+  assert.equal(report.experimental?.electronDriver.available, true);
+  assert.equal(getTauriDriverDependencyStatuses(report.dependencies).length, 1);
 });
 
 test("missing required message lists missing dependencies and hints", () => {

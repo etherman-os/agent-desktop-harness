@@ -75,7 +75,12 @@ export async function runSmokeX11(
       cwd: parsed.workspacePath
     });
 
-    const windows = await waitForWindows(manager, session.id, 5000);
+    await manager.waitForWindow(session.id, {
+      excludeDevtools: true,
+      preferLargest: true,
+      timeoutMs: 5000
+    });
+    const windows = await manager.getWindows(session.id);
     const firstScreenshot = await manager.captureScreenshot(session.id, {
       label: "smoke-initial"
     });
@@ -99,7 +104,10 @@ export async function runSmokeX11(
       label: "smoke-stable",
       timeoutMs: 3000,
       intervalMs: 500,
-      stableChecks: 1
+      stableChecks: 1,
+      mode: "tolerant",
+      fileSizeToleranceBytes: 2048,
+      retainOnlyLast: true
     });
 
     result = {

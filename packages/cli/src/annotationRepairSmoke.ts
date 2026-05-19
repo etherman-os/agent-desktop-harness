@@ -53,10 +53,22 @@ export interface SmokeAnnotationRepairResult {
   readonly cropPath?: string;
   readonly visualHandoffPath: string;
   readonly afterScreenshotPath: string;
+  readonly visualCompare: VisualQaSmokeSummary;
+  readonly visualAssertChanged: VisualQaSmokeSummary;
+  readonly visualAssertChangeContained?: VisualQaSmokeSummary;
   readonly cleanupSucceeded: boolean;
   readonly stopped: boolean;
   readonly serverStopped: boolean;
   readonly viteStopped: boolean;
+}
+
+export interface VisualQaSmokeSummary {
+  readonly diffPixelRatio: number;
+  readonly passed?: boolean;
+  readonly diffPath?: string;
+  readonly insideDiffPixelRatio?: number;
+  readonly outsideDiffPixelRatio?: number;
+  readonly containmentPassed?: boolean;
 }
 
 export interface SmokeAnnotationRepairOptions {
@@ -152,7 +164,10 @@ export async function runSmokeAnnotationRepairDemo(
         timeoutMs: 5000,
         intervalMs: 500,
         stableChecks: 1,
-        label: "repair-demo-before-stable"
+        label: "repair-demo-before-stable",
+        mode: "tolerant",
+        fileSizeToleranceBytes: 4096,
+        retainOnlyLast: true
       }
     });
 
@@ -192,7 +207,10 @@ export async function runSmokeAnnotationRepairDemo(
         timeoutMs: 5000,
         intervalMs: 500,
         stableChecks: 1,
-        label: "repair-demo-after-fix-stable"
+        label: "repair-demo-after-fix-stable",
+        mode: "tolerant",
+        fileSizeToleranceBytes: 4096,
+        retainOnlyLast: true
       }
     });
     const afterScreenshot = await httpJsonRequest<ScreenshotResponse>(
@@ -205,10 +223,70 @@ export async function runSmokeAnnotationRepairDemo(
         }
       }
     );
-    await assertScreenshotsDiffer(
-      beforeScreenshot.screenshot.path,
-      afterScreenshot.screenshot.path
+
+    const visualCompare = await httpJsonRequest<VisualCompareResponse>(
+      fetchLike,
+      `${httpBaseUrl}/sessions/${sessionId}/visual/compare`,
+      {
+        method: "POST",
+        body: {
+          beforePath: beforeScreenshot.screenshot.path,
+          afterPath: afterScreenshot.screenshot.path,
+          label: "repair-before-after",
+          createDiffImage: true,
+          threshold: 0.1
+        }
+      }
     );
+    if (!visualCompare.result.diffPath) {
+      throw new Error("Annotation repair visual compare did not produce a diff image path.");
+    }
+    await stat(visualCompare.result.diffPath);
+
+    const visualAssertChanged = await httpJsonRequest<VisualCompareResponse>(
+      fetchLike,
+      `${httpBaseUrl}/sessions/${sessionId}/visual/assert-annotation-changed`,
+      {
+        method: "POST",
+        body: {
+          annotationId: annotationResponse.annotation.id,
+          afterPath: afterScreenshot.screenshot.path,
+          label: "repair-annotation-region-change",
+          minDiffPixelRatio: 0.0001,
+          threshold: 0.1,
+          createDiffImage: true
+        }
+      }
+    );
+    if (visualAssertChanged.result.passed !== true) {
+      throw new Error(
+        `Annotation repair visual assert-changed failed with diffPixelRatio=${visualAssertChanged.result.diffPixelRatio}.`
+      );
+    }
+    if (visualAssertChanged.result.diffPath) {
+      await stat(visualAssertChanged.result.diffPath);
+    }
+
+    const visualAssertChangeContained = await httpJsonRequest<VisualCompareResponse>(
+      fetchLike,
+      `${httpBaseUrl}/sessions/${sessionId}/visual/assert-change-contained`,
+      {
+        method: "POST",
+        body: {
+          beforePath: beforeScreenshot.screenshot.path,
+          afterPath: afterScreenshot.screenshot.path,
+          label: "repair-change-contained",
+          allowedRegions: [REPAIR_DEMO_ANNOTATION_RECT],
+          minInsideDiffPixelRatio: 0.0001,
+          maxOutsideDiffPixelRatio: 0.05,
+          threshold: 0.1,
+          createDiffImage: true
+        }
+      }
+    );
+    if (visualAssertChangeContained.result.diffPath) {
+      await stat(visualAssertChangeContained.result.diffPath);
+    }
 
     const handoff = await httpJsonRequest<VisualHandoffResponse>(
       fetchLike,
@@ -231,7 +309,10 @@ export async function runSmokeAnnotationRepairDemo(
       annotationId: annotationResponse.annotation.id,
       cropPath: annotationResponse.annotation.cropPath,
       visualHandoffPath: handoff.path,
-      afterScreenshotPath: afterScreenshot.screenshot.path
+      afterScreenshotPath: afterScreenshot.screenshot.path,
+      visualCompare: summarizeVisualResult(visualCompare.result),
+      visualAssertChanged: summarizeVisualResult(visualAssertChanged.result),
+      visualAssertChangeContained: summarizeVisualResult(visualAssertChangeContained.result)
     };
   } catch (error) {
     runError = error;
@@ -389,15 +470,22 @@ async function focusFirstWindow(
   baseUrl: string,
   sessionId: string
 ): Promise<void> {
-  const windows = await waitForHttpWindows(fetchLike, baseUrl, sessionId);
-  const target = windows[0];
-  if (!target) {
-    throw new Error("Annotation repair smoke could not find a browser window.");
-  }
+  const response = await httpJsonRequest<WaitForWindowResponse>(
+    fetchLike,
+    `${baseUrl}/sessions/${sessionId}/wait-for-window`,
+    {
+      method: "POST",
+      body: {
+        excludeDevtools: true,
+        preferLargest: true,
+        timeoutMs: 8000
+      }
+    }
+  );
   await httpJsonRequest(fetchLike, `${baseUrl}/sessions/${sessionId}/focus-window`, {
     method: "POST",
     body: {
-      id: target.id
+      id: response.window.id
     }
   });
   await delay(500);
@@ -436,11 +524,15 @@ async function navigateBrowserTo(
   await delay(1000);
 }
 
-async function assertScreenshotsDiffer(leftPath: string, rightPath: string): Promise<void> {
-  const [left, right] = await Promise.all([readFile(leftPath), readFile(rightPath)]);
-  if (left.equals(right)) {
-    throw new Error("Annotation repair before/after screenshots did not change.");
-  }
+function summarizeVisualResult(result: VisualCompareResult): VisualQaSmokeSummary {
+  return {
+    diffPixelRatio: result.diffPixelRatio,
+    passed: result.passed,
+    diffPath: result.diffPath,
+    insideDiffPixelRatio: result.insideDiffPixelRatio,
+    outsideDiffPixelRatio: result.outsideDiffPixelRatio,
+    containmentPassed: result.containmentPassed
+  };
 }
 
 function startViteServer(rootPath: string, port: number): ChildProcess {
@@ -654,10 +746,27 @@ interface VisualHandoffResponse {
   readonly text: string;
 }
 
+interface VisualCompareResponse {
+  readonly result: VisualCompareResult;
+}
+
+interface VisualCompareResult {
+  readonly diffPath?: string;
+  readonly diffPixelRatio: number;
+  readonly passed?: boolean;
+  readonly insideDiffPixelRatio?: number;
+  readonly outsideDiffPixelRatio?: number;
+  readonly containmentPassed?: boolean;
+}
+
 interface HttpWindowInfo {
   readonly id: string;
   readonly title: string;
   readonly pid?: number;
+}
+
+interface WaitForWindowResponse {
+  readonly window: HttpWindowInfo;
 }
 
 interface WindowsResponse {

@@ -4,18 +4,59 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { SessionManager } from "@agent-desktop-harness/core";
 import { z } from "zod";
 import {
+  appAssertTextSchema,
+  appClickSchema,
+  appCloseSchema,
+  appFillSchema,
+  appOpenSchema,
+  appPressSchema,
+  appScreenshotSchema,
+  browserAssertTextSchema,
+  browserClickSchema,
+  browserCloseSchema,
+  browserFillSchema,
+  browserOpenSchema,
+  browserPressSchema,
+  browserScreenshotSchema,
   clickSchema,
   createAnnotationSchema,
+  electronAssertTextSchema,
+  electronClickSchema,
+  electronCloseSchema,
+  electronFillSchema,
+  electronOpenSchema,
+  electronPressSchema,
+  electronScreenshotSchema,
+  driverRouteSchema,
   focusWindowSchema,
   hotkeySchema,
   launchAppSchema,
   noArgsSchema,
+  observerListSchema,
+  observerStartSchema,
+  observerStopSchema,
   screenshotSchema,
   scrollSchema,
   sessionIdSchema,
   startSessionSchema,
+  tauriAssertTextSchema,
+  tauriClickSchema,
+  tauriCloseSchema,
+  tauriFillSchema,
+  tauriOpenSchema,
+  tauriScreenshotSchema,
   typeTextSchema,
-  waitForStableScreenSchema
+  waitForStableScreenSchema,
+  waitForWindowSchema,
+  visualAssertAnnotationChangedSchema,
+  visualAssertAnnotationSimilarSchema,
+  visualAssertChangedSchema,
+  visualAssertChangeContainedSchema,
+  visualAssertSimilarSchema,
+  visualCompareBaselineSchema,
+  visualCompareSchema,
+  visualListBaselinesSchema,
+  visualSaveBaselineSchema
 } from "./schemas.js";
 import { DesktopMcpToolHandlers } from "./toolHandlers.js";
 
@@ -110,6 +151,11 @@ export function registerDesktopHarnessTools(
     schema: waitForStableScreenSchema,
     handler: (args) => handlers.waitForStableScreen(args)
   });
+  registerTool(server, "desktop_wait_for_window", {
+    description: "Wait until a matching app window appears in a desktop session.",
+    schema: waitForWindowSchema,
+    handler: (args) => handlers.waitForWindow(args)
+  });
   registerTool(server, "desktop_stop_session", {
     description: "Stop a desktop session and clean up child processes.",
     schema: sessionIdSchema,
@@ -139,6 +185,231 @@ export function registerDesktopHarnessTools(
     description: "Read visual-handoff.md for a desktop session.",
     schema: sessionIdSchema,
     handler: (args) => handlers.getVisualHandoff(args)
+  });
+  registerTool(server, "browser_open", {
+    description: "Open a browser page inside an isolated desktop session using Playwright.",
+    schema: browserOpenSchema,
+    handler: (args) => handlers.browserOpen(args)
+  });
+  registerTool(server, "browser_click", {
+    description: "Click a browser element by selector, test id, role/name, label, placeholder, or text.",
+    schema: browserClickSchema,
+    handler: (args) => handlers.browserClick(args)
+  });
+  registerTool(server, "browser_fill", {
+    description: "Fill a browser element by selector, test id, role/name, label, placeholder, or text.",
+    schema: browserFillSchema,
+    handler: (args) => handlers.browserFill(args)
+  });
+  registerTool(server, "browser_press", {
+    description: "Press a key on a browser page or focused browser element.",
+    schema: browserPressSchema,
+    handler: (args) => handlers.browserPress(args)
+  });
+  registerTool(server, "browser_assert_text", {
+    description: "Assert that text is visible on a browser page.",
+    schema: browserAssertTextSchema,
+    handler: (args) => handlers.browserAssertText(args)
+  });
+  registerTool(server, "browser_screenshot", {
+    description: "Capture a Playwright browser-content screenshot into session evidence.",
+    schema: browserScreenshotSchema,
+    handler: (args) => handlers.browserScreenshot(args)
+  });
+  registerTool(server, "browser_close", {
+    description: "Close a browser page or all browser pages for a session.",
+    schema: browserCloseSchema,
+    handler: (args) => handlers.browserClose(args)
+  });
+  registerTool(server, "tauri_get_status", {
+    description: "Experimental: inspect Tauri WebDriver prerequisite availability.",
+    schema: noArgsSchema,
+    handler: (args) => handlers.tauriGetStatus(args)
+  });
+  registerTool(server, "tauri_open", {
+    description: "Experimental: open a Tauri app through tauri-driver when possible, otherwise explicit X11 fallback.",
+    schema: tauriOpenSchema,
+    handler: (args) => handlers.tauriOpen(args)
+  });
+  registerTool(server, "tauri_click", {
+    description: "Experimental: click a Tauri webview element through WebDriver when available.",
+    schema: tauriClickSchema,
+    handler: (args) => handlers.tauriClick(args)
+  });
+  registerTool(server, "tauri_fill", {
+    description: "Experimental: fill a Tauri webview element through WebDriver when available.",
+    schema: tauriFillSchema,
+    handler: (args) => handlers.tauriFill(args)
+  });
+  registerTool(server, "tauri_assert_text", {
+    description: "Experimental: assert visible Tauri webview text through WebDriver when available.",
+    schema: tauriAssertTextSchema,
+    handler: (args) => handlers.tauriAssertText(args)
+  });
+  registerTool(server, "tauri_screenshot", {
+    description: "Experimental: capture Tauri WebDriver screenshot, falling back to desktop screenshot evidence.",
+    schema: tauriScreenshotSchema,
+    handler: (args) => handlers.tauriScreenshot(args)
+  });
+  registerTool(server, "tauri_close", {
+    description: "Experimental: close tracked Tauri app and tauri-driver resources.",
+    schema: tauriCloseSchema,
+    handler: (args) => handlers.tauriClose(args)
+  });
+  registerTool(server, "electron_get_status", {
+    description: "Experimental: inspect Playwright Electron driver readiness.",
+    schema: noArgsSchema,
+    handler: (args) => handlers.electronGetStatus(args)
+  });
+  registerTool(server, "electron_open", {
+    description: "Experimental: open an Electron app through Playwright Electron when possible, otherwise explicit X11 fallback.",
+    schema: electronOpenSchema,
+    handler: (args) => handlers.electronOpen(args)
+  });
+  registerTool(server, "electron_click", {
+    description: "Experimental: click an Electron renderer element by selector, test id, role/name, label, placeholder, or text.",
+    schema: electronClickSchema,
+    handler: (args) => handlers.electronClick(args)
+  });
+  registerTool(server, "electron_fill", {
+    description: "Experimental: fill an Electron renderer element through Playwright Electron when available.",
+    schema: electronFillSchema,
+    handler: (args) => handlers.electronFill(args)
+  });
+  registerTool(server, "electron_press", {
+    description: "Experimental: press a key in an Electron renderer window.",
+    schema: electronPressSchema,
+    handler: (args) => handlers.electronPress(args)
+  });
+  registerTool(server, "electron_assert_text", {
+    description: "Experimental: assert visible Electron renderer text through Playwright Electron.",
+    schema: electronAssertTextSchema,
+    handler: (args) => handlers.electronAssertText(args)
+  });
+  registerTool(server, "electron_screenshot", {
+    description: "Experimental: capture an Electron renderer screenshot, falling back to desktop screenshot evidence.",
+    schema: electronScreenshotSchema,
+    handler: (args) => handlers.electronScreenshot(args)
+  });
+  registerTool(server, "electron_close", {
+    description: "Experimental: close tracked Electron app resources.",
+    schema: electronCloseSchema,
+    handler: (args) => handlers.electronClose(args)
+  });
+  registerTool(server, "driver_get_status", {
+    description: "High-level router: inspect browser, Tauri, Electron, and X11 driver readiness.",
+    schema: noArgsSchema,
+    handler: (args) => handlers.driverGetStatus(args)
+  });
+  registerTool(server, "observer_get_status", {
+    description: "Optional live observer: inspect local x11vnc/noVNC dependency readiness.",
+    schema: noArgsSchema,
+    handler: (args) => handlers.observerGetStatus(args)
+  });
+  registerTool(server, "observer_start", {
+    description: "Optional live observer: start a localhost noVNC view for an isolated Xvfb session.",
+    schema: observerStartSchema,
+    handler: (args) => handlers.observerStart(args)
+  });
+  registerTool(server, "observer_list", {
+    description: "Optional live observer: list active live observers.",
+    schema: observerListSchema,
+    handler: (args) => handlers.observerList(args)
+  });
+  registerTool(server, "observer_stop", {
+    description: "Optional live observer: stop an active live observer.",
+    schema: observerStopSchema,
+    handler: (args) => handlers.observerStop(args)
+  });
+  registerTool(server, "driver_route", {
+    description: "High-level router: choose the best available driver for an app kind.",
+    schema: driverRouteSchema,
+    handler: (args) => handlers.driverRoute(args)
+  });
+  registerTool(server, "app_open", {
+    description: "High-level router: open an app through the selected semantic driver or X11 fallback.",
+    schema: appOpenSchema,
+    handler: (args) => handlers.appOpen(args)
+  });
+  registerTool(server, "app_click", {
+    description: "High-level router: click using a semantic target when available, or X/Y fallback when selected.",
+    schema: appClickSchema,
+    handler: (args) => handlers.appClick(args)
+  });
+  registerTool(server, "app_fill", {
+    description: "High-level router: fill text using a semantic target when available, or focused X11 fallback.",
+    schema: appFillSchema,
+    handler: (args) => handlers.appFill(args)
+  });
+  registerTool(server, "app_press", {
+    description: "High-level router: press a key through the selected driver.",
+    schema: appPressSchema,
+    handler: (args) => handlers.appPress(args)
+  });
+  registerTool(server, "app_assert_text", {
+    description: "High-level router: assert text with semantic drivers; X11 fallback currently has no OCR.",
+    schema: appAssertTextSchema,
+    handler: (args) => handlers.appAssertText(args)
+  });
+  registerTool(server, "app_screenshot", {
+    description: "High-level router: capture a screenshot through the selected driver or X11 fallback.",
+    schema: appScreenshotSchema,
+    handler: (args) => handlers.appScreenshot(args)
+  });
+  registerTool(server, "app_close", {
+    description: "High-level router: close one routed app or all routed apps in a session.",
+    schema: appCloseSchema,
+    handler: (args) => handlers.appClose(args)
+  });
+  registerTool(server, "visual_compare", {
+    description: "Compare two PNG evidence screenshots and optionally create a diff PNG.",
+    schema: visualCompareSchema,
+    handler: (args) => handlers.visualCompare(args)
+  });
+  registerTool(server, "visual_assert_changed", {
+    description: "Assert that two PNG evidence screenshots or regions changed by at least a threshold.",
+    schema: visualAssertChangedSchema,
+    handler: (args) => handlers.visualAssertChanged(args)
+  });
+  registerTool(server, "visual_assert_similar", {
+    description: "Assert that two PNG evidence screenshots or regions remain within a diff threshold.",
+    schema: visualAssertSimilarSchema,
+    handler: (args) => handlers.visualAssertSimilar(args)
+  });
+  registerTool(server, "visual_save_baseline", {
+    description: "Save a PNG screenshot evidence artifact as a named local visual baseline.",
+    schema: visualSaveBaselineSchema,
+    handler: (args) => handlers.visualSaveBaseline(args)
+  });
+  registerTool(server, "visual_list_baselines", {
+    description: "List named local visual baselines for a session workspace.",
+    schema: visualListBaselinesSchema,
+    handler: (args) => handlers.visualListBaselines(args)
+  });
+  registerTool(server, "visual_compare_baseline", {
+    description: "Compare a PNG screenshot evidence artifact to a named visual baseline.",
+    schema: visualCompareBaselineSchema,
+    handler: (args) => handlers.visualCompareBaseline(args)
+  });
+  registerTool(server, "visual_assert_annotation_changed", {
+    description: "Use a rectangle annotation as the region for a changed assertion.",
+    schema: visualAssertAnnotationChangedSchema,
+    handler: (args) => handlers.visualAssertAnnotationChanged(args)
+  });
+  registerTool(server, "visual_assert_annotation_similar", {
+    description: "Use a rectangle annotation as the region for a similar assertion.",
+    schema: visualAssertAnnotationSimilarSchema,
+    handler: (args) => handlers.visualAssertAnnotationSimilar(args)
+  });
+  registerTool(server, "visual_assert_change_contained", {
+    description: "Assert that pixel changes stay inside allowed regions.",
+    schema: visualAssertChangeContainedSchema,
+    handler: (args) => handlers.visualAssertChangeContained(args)
+  });
+  registerTool(server, "visual_list_assertions", {
+    description: "List visual comparison/assertion results recorded for a session.",
+    schema: sessionIdSchema,
+    handler: (args) => handlers.visualListAssertions(args)
   });
 }
 

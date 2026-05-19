@@ -185,6 +185,7 @@ export interface LaunchResult {
 
 export interface ScreenshotOptions {
   readonly label?: string;
+  readonly transient?: boolean;
 }
 
 export type ActionLogType =
@@ -201,7 +202,48 @@ export type ActionLogType =
   | "input.scroll"
   | "window.list"
   | "window.focus"
+  | "window.find"
+  | "window.focus_best"
+  | "window.wait_for_window"
   | "screen.wait_for_stable"
+  | "browser.open"
+  | "browser.click"
+  | "browser.fill"
+  | "browser.press"
+  | "browser.assert_text"
+  | "browser.screenshot"
+  | "browser.close"
+  | "tauri.open"
+  | "tauri.click"
+  | "tauri.fill"
+  | "tauri.assert_text"
+  | "tauri.screenshot"
+  | "tauri.close"
+  | "electron.open"
+  | "electron.click"
+  | "electron.fill"
+  | "electron.press"
+  | "electron.assert_text"
+  | "electron.screenshot"
+  | "electron.close"
+  | "driver.route"
+  | "app.open"
+  | "app.click"
+  | "app.fill"
+  | "app.press"
+  | "app.assert_text"
+  | "app.screenshot"
+  | "app.close"
+  | "visual.compare"
+  | "visual.assert_changed"
+  | "visual.assert_similar"
+  | "visual.baseline_saved"
+  | "visual.compare_baseline"
+  | "visual.assert_annotation_changed"
+  | "visual.assert_annotation_similar"
+  | "visual.assert_change_contained"
+  | "observer.start"
+  | "observer.stop"
   | "annotation.created"
   | "error";
 
@@ -253,14 +295,33 @@ export interface WindowInfo {
   readonly title: string;
   readonly desktop?: string;
   readonly pid?: number;
+  readonly x?: number;
+  readonly y?: number;
+  readonly width?: number;
+  readonly height?: number;
   readonly raw?: string;
+}
+
+export interface WindowFilter {
+  readonly titleIncludes?: string;
+  readonly titleExcludes?: readonly string[];
+  readonly pid?: number;
+  readonly preferLargest?: boolean;
+  readonly excludeDevtools?: boolean;
+}
+
+export interface FindWindowOptions extends WindowFilter {
+  readonly required?: boolean;
 }
 
 export interface FocusWindowTarget {
   readonly id?: string;
   readonly title?: string;
   readonly titleIncludes?: string;
+  readonly titleExcludes?: readonly string[];
   readonly pid?: number;
+  readonly preferLargest?: boolean;
+  readonly excludeDevtools?: boolean;
 }
 
 export interface WindowActionResult {
@@ -275,6 +336,10 @@ export interface WaitForStableScreenOptions {
   readonly intervalMs?: number;
   readonly stableChecks?: number;
   readonly label?: string;
+  readonly mode?: "hash" | "fileSize" | "tolerant";
+  readonly fileSizeToleranceBytes?: number;
+  readonly maxRetainedScreenshots?: number;
+  readonly retainOnlyLast?: boolean;
 }
 
 export interface WaitForStableScreenResult {
@@ -282,5 +347,14 @@ export interface WaitForStableScreenResult {
   readonly stable: boolean;
   readonly checks: number;
   readonly elapsedMs: number;
+  readonly mode?: "hash" | "fileSize" | "tolerant";
+  readonly retainedScreenshots?: readonly ScreenshotResult[];
+  readonly discardedScreenshotCount?: number;
   readonly lastScreenshot?: ScreenshotResult;
+  readonly reason?: string;
+}
+
+export interface WaitForWindowOptions extends WindowFilter {
+  readonly timeoutMs?: number;
+  readonly intervalMs?: number;
 }

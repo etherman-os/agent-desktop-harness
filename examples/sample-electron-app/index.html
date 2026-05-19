@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Agent Desktop Harness Electron Demo</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="panel">
+        <p class="eyebrow">Electron semantic driver demo</p>
+        <h1>Agent Desktop Harness Electron Demo</h1>
+        <label class="field">
+          <span>Message</span>
+          <input id="message-input" placeholder="Type a message" autocomplete="off">
+        </label>
+        <div class="actions">
+          <button id="save-button" type="button">Save message</button>
+          <button id="details-button" type="button">Open details</button>
+        </div>
+        <p id="status" class="status">Status: idle</p>
+        <p id="saved-message" class="saved-message" aria-live="polite"></p>
+        <section id="details" class="details" hidden>
+          <h2>Details panel is open</h2>
+          <p>Semantic Electron actions reached this renderer without coordinate input.</p>
+        </section>
+      </section>
+    </main>
+    <script src="./renderer.js"></script>
+  </body>
+</html>

@@ -2,11 +2,17 @@
 
 import { SessionManager } from "@agent-desktop-harness/core";
 import { runSmokeAnnotationRepairDemo } from "./annotationRepairSmoke.js";
+import { runSmokeBrowserSemantic } from "./browserSemanticSmoke.js";
 import { formatDoctorText, runDoctor } from "./doctor.js";
+import { runSmokeDriverRouter } from "./driverRouterSmoke.js";
+import { runSmokeElectronDriver } from "./electronDriverSmoke.js";
 import { runSmokeHttp } from "./httpSmoke.js";
 import { runSmokeMcp } from "./mcpSmoke.js";
+import { runObserverStatusCommand, runSmokeObserver } from "./observerSmoke.js";
 import { runSmokeX11 } from "./smoke.js";
+import { runSmokeTauriDriver } from "./tauriDriverSmoke.js";
 import { runSmokeViteHttp, runSmokeViteMcp } from "./viteSmoke.js";
+import { runSmokeVisualBaseline, runSmokeVisualQa } from "./visualQaSmoke.js";
 import { defaultWorkspacePath } from "./workspace.js";
 
 interface StartSessionArgs {
@@ -43,6 +49,12 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (command === "observer-status") {
+    const result = await runObserverStatusCommand();
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
   if (command === "smoke-x11") {
     const result = await runSmokeX11(args);
     console.log(JSON.stringify(result, null, 2));
@@ -75,6 +87,48 @@ async function main(): Promise<void> {
 
   if (command === "smoke-annotation-repair-demo") {
     const result = await runSmokeAnnotationRepairDemo(args);
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (command === "smoke-browser-semantic") {
+    const result = await runSmokeBrowserSemantic(args);
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (command === "smoke-tauri-driver") {
+    const result = await runSmokeTauriDriver(args);
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (command === "smoke-electron-driver") {
+    const result = await runSmokeElectronDriver(args);
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (command === "smoke-driver-router") {
+    const result = await runSmokeDriverRouter(args);
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (command === "smoke-visual-qa") {
+    const result = await runSmokeVisualQa(args);
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (command === "smoke-visual-baseline") {
+    const result = await runSmokeVisualBaseline(args);
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (command === "smoke-observer") {
+    const result = await runSmokeObserver(args);
     console.log(JSON.stringify(result, null, 2));
     return;
   }
@@ -285,23 +339,42 @@ function printUsage(): void {
   agent-desktop-harness start-session [--workspace DIR] [--screenshot] [--label LABEL] [--once]
   agent-desktop-harness doctor [--json]
   agent-desktop-harness annotate-url --session SESSION_ID [--host HOST] [--port PORT] [--screenshot FILE]
+  agent-desktop-harness observer-status
   agent-desktop-harness smoke-x11 [--workspace DIR] [--command CMD] [--args a,b] [--text TEXT]
   agent-desktop-harness smoke-http [--workspace DIR] [--port PORT] [--text TEXT]
   agent-desktop-harness smoke-mcp [--workspace DIR] [--text TEXT]
   agent-desktop-harness smoke-vite-http [--workspace DIR] [--vite-port PORT] [--http-port PORT] [--text TEXT]
   agent-desktop-harness smoke-vite-mcp [--workspace DIR] [--vite-port PORT] [--text TEXT]
   agent-desktop-harness smoke-annotation-repair-demo [--workspace DIR] [--vite-port PORT] [--http-port PORT]
+  agent-desktop-harness smoke-browser-semantic [--workspace DIR] [--vite-port PORT] [--http-port PORT] [--text TEXT]
+  agent-desktop-harness smoke-tauri-driver [--cwd DIR] [--command CMD] [--application PATH] [--app-path PATH] [--window-title TITLE]
+                                     [--prelaunch-command CMD] [--prelaunch-cwd DIR] [--prelaunch-wait-url URL]
+  agent-desktop-harness smoke-electron-driver [--cwd DIR] [--command CMD] [--args ARGS] [--executable-path PATH]
+                                      [--app-path PATH] [--window-title TITLE] [--text TEXT]
+  agent-desktop-harness smoke-driver-router [--workspace DIR] [--vite-port PORT] [--http-port PORT] [--text TEXT]
+  agent-desktop-harness smoke-visual-qa [--workspace DIR] [--vite-port PORT] [--http-port PORT] [--text TEXT]
+  agent-desktop-harness smoke-visual-baseline [--workspace DIR] [--vite-port PORT] [--http-port PORT]
+                                        [--text TEXT] [--baseline-name NAME] [--suite SUITE]
+  agent-desktop-harness smoke-observer [--workspace DIR] [--vnc-port PORT] [--web-port PORT]
 
 Examples:
   pnpm --filter @agent-desktop-harness/cli dev -- start-session --screenshot --once
   pnpm --filter @agent-desktop-harness/cli dev -- doctor
   pnpm --filter @agent-desktop-harness/cli dev -- annotate-url --session SESSION_ID
+  pnpm --filter @agent-desktop-harness/cli dev -- observer-status
   pnpm --filter @agent-desktop-harness/cli dev -- smoke-x11 --command xterm
   pnpm --filter @agent-desktop-harness/cli dev -- smoke-http
   pnpm --filter @agent-desktop-harness/cli dev -- smoke-mcp
   pnpm --filter @agent-desktop-harness/cli dev -- smoke-vite-http
   pnpm --filter @agent-desktop-harness/cli dev -- smoke-vite-mcp
   pnpm --filter @agent-desktop-harness/cli dev -- smoke-annotation-repair-demo
+  pnpm --filter @agent-desktop-harness/cli dev -- smoke-browser-semantic
+  pnpm --filter @agent-desktop-harness/cli dev -- smoke-tauri-driver
+  pnpm --filter @agent-desktop-harness/cli dev -- smoke-electron-driver
+  pnpm --filter @agent-desktop-harness/cli dev -- smoke-driver-router
+  pnpm --filter @agent-desktop-harness/cli dev -- smoke-visual-qa
+  pnpm --filter @agent-desktop-harness/cli dev -- smoke-visual-baseline
+  pnpm --filter @agent-desktop-harness/cli dev -- smoke-observer
 `);
 }
 

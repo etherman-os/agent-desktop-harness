@@ -122,6 +122,55 @@ test("EvidenceStore lists screenshots and creates visual annotations", async () 
   }
 });
 
+test("EvidenceStore appends visual assertions and includes them in reports", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "agent-desktop-harness-visual-assertions-"));
+  const store = new EvidenceStore();
+  const session = makeSession(tempRoot, store);
+
+  try {
+    await store.createSession(session);
+    const paths = store.getPaths(tempRoot, session.id);
+    const beforePath = join(paths.screenshotsPath, "0001-before.png");
+    const afterPath = join(paths.screenshotsPath, "0002-after.png");
+    const diffPath = await store.getNextVisualDiffPath(session, "before-after");
+    await writeFile(beforePath, parsePngBase64(tinyPngDataUrl));
+    await writeFile(afterPath, parsePngBase64(tinyPngDataUrl));
+    await writeFile(diffPath, parsePngBase64(tinyPngDataUrl));
+
+    await store.appendVisualAssertion(session, {
+      sessionId: session.id,
+      label: "before-after",
+      kind: "assert-similar",
+      beforePath,
+      afterPath,
+      diffPath,
+      width: 1,
+      height: 1,
+      comparedPixels: 1,
+      diffPixels: 0,
+      diffPixelRatio: 0,
+      threshold: 0.1,
+      maxDiffPixelRatio: 0.01,
+      passed: true,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      warnings: []
+    });
+
+    const assertions = await store.listVisualAssertions(session);
+    assert.equal(assertions.length, 1);
+    assert.equal(assertions[0]?.label, "before-after");
+    assert.equal(diffPath.endsWith("visual-diffs/diff_001-before-after.png"), true);
+
+    await store.writeReport(session);
+    const report = await readFile(paths.reportPath, "utf8");
+    assert.match(report, /## Visual QA/);
+    assert.match(report, /label=before-after/);
+    assert.match(report, /passed=true/);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("EvidenceStore rejects traversal and invalid crop payloads", () => {
   assert.throws(
     () => assertSafePngFileName("../0001-bug.png", "screenshot file name"),
@@ -135,6 +184,26 @@ test("EvidenceStore rejects traversal and invalid crop payloads", () => {
     () => parsePngBase64("SGVsbG8="),
     /PNG image/
   );
+});
+
+test("EvidenceStore rejects visual QA path traversal", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "agent-desktop-harness-visual-paths-"));
+  const store = new EvidenceStore();
+  const session = makeSession(tempRoot, store);
+
+  try {
+    await store.createSession(session);
+    assert.throws(
+      () => store.resolveEvidencePath(session, "../outside.png"),
+      /outside the session evidence directory/
+    );
+    assert.throws(
+      () => store.resolveEvidencePath(session, "screenshots/not-png.jpg"),
+      /PNG files/
+    );
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
 });
 
 function makeSession(tempRoot: string, store: EvidenceStore): DesktopSession {

@@ -147,12 +147,22 @@ export async function runSmokeViteHttp(
       }
     });
 
-    const windows = await waitForHttpWindows(fetchLike, httpBaseUrl, sessionId);
-    const targetWindow = selectBrowserWindow(windows);
+    const windowResponse = await httpJsonRequest<WaitForWindowResponse>(
+      fetchLike,
+      `${httpBaseUrl}/sessions/${sessionId}/wait-for-window`,
+      {
+        method: "POST",
+        body: {
+          excludeDevtools: true,
+          preferLargest: true,
+          timeoutMs: 8000
+        }
+      }
+    );
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/focus-window`, {
       method: "POST",
       body: {
-        id: targetWindow.id
+        id: windowResponse.window.id
       }
     });
     await delay(1000);
@@ -236,7 +246,10 @@ export async function runSmokeViteHttp(
           timeoutMs: 5000,
           intervalMs: 500,
           stableChecks: 1,
-          label: "vite-http-stable"
+          label: "vite-http-stable",
+          mode: "tolerant",
+          fileSizeToleranceBytes: 4096,
+          retainOnlyLast: true
         }
       }
     );
@@ -371,6 +384,7 @@ export async function runSmokeViteMcp(
     await client.assertTools([
       "desktop_start_session",
       "desktop_launch_app",
+      "desktop_wait_for_window",
       "desktop_wait_for_stable_screen",
       "desktop_screenshot",
       "desktop_get_windows",
@@ -399,8 +413,12 @@ export async function runSmokeViteMcp(
       label: "vite-mcp-browser"
     });
 
-    const windows = await waitForMcpWindows(client, sessionId);
-    const targetWindow = selectBrowserWindow(windows);
+    const targetWindow = await client.callTool<HttpWindowInfo>("desktop_wait_for_window", {
+      sessionId,
+      excludeDevtools: true,
+      preferLargest: true,
+      timeoutMs: 8000
+    });
     await client.callTool("desktop_focus_window", {
       sessionId,
       id: targetWindow.id
@@ -467,7 +485,10 @@ export async function runSmokeViteMcp(
         timeoutMs: 5000,
         intervalMs: 500,
         stableChecks: 1,
-        label: "vite-mcp-stable"
+        label: "vite-mcp-stable",
+        mode: "tolerant",
+        fileSizeToleranceBytes: 4096,
+        retainOnlyLast: true
       }
     );
 
@@ -884,6 +905,10 @@ interface ScreenshotResponse {
 
 interface WaitForStableScreenResponse {
   readonly result: StableScreenToolResult;
+}
+
+interface WaitForWindowResponse {
+  readonly window: HttpWindowInfo;
 }
 
 interface StableScreenToolResult {

@@ -21,7 +21,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "echo \"No lint configured yet for @agent-desktop-harness/cli\"",
-    "test": "pnpm --filter @agent-desktop-harness/core build && pnpm build && node --test dist/doctor.test.js dist/smoke.test.js dist/httpSmoke.test.js dist/mcpSmoke.test.js dist/browser.test.js dist/viteSmoke.test.js dist/annotationRepairSmoke.test.js"
+    "test": "pnpm --filter @agent-desktop-harness/core build && pnpm build && node --test dist/docs.test.js dist/doctor.test.js dist/smoke.test.js dist/httpSmoke.test.js dist/mcpSmoke.test.js dist/browser.test.js dist/viteSmoke.test.js dist/annotationRepairSmoke.test.js dist/browserSemanticSmoke.test.js dist/tauriDriverSmoke.test.js dist/electronDriverSmoke.test.js dist/driverRouterSmoke.test.js dist/visualQaSmoke.test.js dist/observerSmoke.test.js"
   },
   "dependencies": {
     "@agent-desktop-harness/core": "workspace:*"

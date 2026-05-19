@@ -4,6 +4,12 @@ Visual Annotation Handoff lets a human mark the exact problem area on a harness 
 
 The goal is to solve a common GUI QA problem: a developer can see the broken sprite, overlap, route, modal, or layout area, but it is hard to describe precisely in words. The harness keeps the original screenshot, stores structured annotation coordinates, saves a crop when the browser UI provides one, and regenerates `visual-handoff.md`.
 
+Visual QA assertions can then compare the annotated before screenshot with an after screenshot and attach diff metrics plus optional diff PNGs to the same evidence report.
+
+The optional live observer can be used alongside this workflow when a human wants to watch the isolated Xvfb session before choosing which screenshot to annotate. The annotation itself remains screenshot-based and durable.
+
+For the full workflow that combines annotation, driver routing, live observation, and Visual QA, see [Agent GUI QA Cockpit](AGENT_GUI_QA_COCKPIT.md).
+
 ## Current MVP
 
 - Rectangle annotation is the supported drawing interaction.
@@ -22,7 +28,10 @@ The goal is to solve a common GUI QA problem: a developer can see the broken spr
         0003-game-bug.png
       annotations/
         ann_001-crop.png
+      visual-diffs/
+        diff_001-repair-before-after.png
       annotations.jsonl
+      visual-assertions.jsonl
       visual-handoff.md
 ```
 
@@ -39,7 +48,7 @@ Each saved annotation appends one JSON object to `annotations.jsonl`. `visual-ha
 7. Save the annotation.
 8. Give `visual-handoff.md` to the agent.
 9. The agent makes a targeted fix.
-10. The agent reruns the app through the harness and captures an after screenshot.
+10. The agent reruns the app through the harness, captures an after screenshot, and runs Visual QA against the annotated region when appropriate.
 
 Generate the local URL with:
 
@@ -90,7 +99,7 @@ It captures a before screenshot, creates a synthetic rectangle annotation with t
 http://127.0.0.1:5180/?demoBug=fixed
 ```
 
-Finally it captures an after screenshot and verifies that before/after screenshots differ.
+Finally it captures an after screenshot, runs Visual QA compare/assertion calls, writes `visual-assertions.jsonl`, verifies that the annotation-derived region changed, and records an informational change-containment check.
 
 This smoke proves the visual handoff pipeline. It does not claim that an autonomous repair agent edited code during the smoke.
 
@@ -104,6 +113,12 @@ POST /sessions/:sessionId/annotations
 GET  /sessions/:sessionId/annotations/:fileName
 GET  /sessions/:sessionId/visual-handoff
 GET  /sessions/:sessionId/annotate
+POST /sessions/:sessionId/visual/compare
+POST /sessions/:sessionId/visual/assert-changed
+POST /sessions/:sessionId/visual/assert-similar
+POST /sessions/:sessionId/visual/assert-annotation-changed
+POST /sessions/:sessionId/visual/assert-annotation-similar
+POST /sessions/:sessionId/visual/assert-change-contained
 ```
 
 Create an annotation:
@@ -136,6 +151,13 @@ desktop_list_screenshots
 desktop_create_annotation
 desktop_list_annotations
 desktop_get_visual_handoff
+visual_compare
+visual_assert_changed
+visual_assert_similar
+visual_assert_annotation_changed
+visual_assert_annotation_similar
+visual_assert_change_contained
+visual_list_assertions
 ```
 
 MCP tools return JSON metadata and paths. They do not stream binary screenshot data in the current MVP.
@@ -154,4 +176,4 @@ MCP tools return JSON metadata and paths. They do not stream binary screenshot d
 - Freehand marks.
 - Multiple screenshot comparison view.
 - Annotation-aware recheck flow.
-- Semantic browser driver integration for DOM-backed element targeting.
+- Baseline-aware visual regression review.

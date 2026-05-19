@@ -1,7 +1,7 @@
 {
   "name": "@agent-desktop-harness/core",
   "version": "0.0.0",
-  "description": "Core engine for isolated desktop sessions, evidence, input, screenshots, and visual handoff.",
+  "description": "Core engine for isolated desktop sessions, driver routing, evidence, visual QA, and live observer coordination.",
   "license": "Apache-2.0",
   "type": "module",
   "repository": {
@@ -9,7 +9,13 @@
     "url": "git+https://github.com/etherman-os/agent-desktop-harness.git",
     "directory": "packages/core"
   },
-  "keywords": ["agent", "gui", "qa", "xvfb", "evidence"],
+  "keywords": [
+    "agent",
+    "gui",
+    "qa",
+    "xvfb",
+    "evidence"
+  ],
   "engines": {
     "node": ">=22"
   },
@@ -21,11 +27,22 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "echo \"No lint configured yet for @agent-desktop-harness/core\"",
-    "test": "pnpm build && node --test dist/session/displayAllocator.test.js dist/policy/PolicyValidator.test.js dist/evidence/EvidenceStore.test.js dist/input/XdotoolInputBackend.test.js dist/window/WmctrlWindowBackend.test.js dist/session/SessionManager.input.test.js"
+    "test": "pnpm build && node --test dist/session/displayAllocator.test.js dist/policy/PolicyValidator.test.js dist/evidence/EvidenceStore.test.js dist/input/XdotoolInputBackend.test.js dist/window/WmctrlWindowBackend.test.js dist/session/SessionManager.input.test.js dist/session/SessionManager.stable.test.js dist/session/SessionManager.visualHardening.test.js dist/drivers/browser/browserSelectors.test.js dist/drivers/browser/PlaywrightBrowserDriver.test.js dist/drivers/tauri/tauriStatus.test.js dist/drivers/tauri/TauriWebDriverDriver.test.js dist/drivers/electron/electronStatus.test.js dist/drivers/router/driverSelection.test.js dist/visual/imageDiff.test.js dist/visual/VisualQaService.test.js dist/visual/geometry.test.js dist/observer/NoVncObserver.test.js"
+  },
+  "dependencies": {
+    "pixelmatch": "^7.2.0",
+    "playwright-core": "^1.60.0",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5"
   }
 }

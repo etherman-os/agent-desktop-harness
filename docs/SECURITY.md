@@ -2,11 +2,11 @@
 
 `agent-desktop-harness` is designed for isolated GUI QA, not unrestricted desktop automation.
 
-v0.1 is local developer tooling. It is intended to run on a developer-controlled machine or CI worker where the caller already has permission to launch the target app and inspect generated evidence.
+The current release candidate is local developer tooling. It is intended to run on a developer-controlled machine or CI worker where the caller already has permission to launch the target app and inspect generated evidence.
 
 ## Real Desktop Control Is Disabled by Default
 
-The v0.1 target is Xvfb sessions created for the harness. The harness must not send input to the user's real desktop. This boundary reduces the risk of accidental clicks, data exposure, credential leakage, and destructive actions in unrelated applications.
+The default target is Xvfb sessions created for the harness. The harness must not send input to the user's real desktop. This boundary reduces the risk of accidental clicks, data exposure, credential leakage, and destructive actions in unrelated applications.
 
 ## Command Allowlist
 
@@ -46,6 +46,23 @@ The MCP server exposes `desktop_launch_app` with structured `{ command, args, cw
 The HTTP server is intended for local agent orchestration. It binds to `127.0.0.1` by default and should not be exposed to the public internet. CORS is not enabled by default.
 
 Do not run the HTTP server on `0.0.0.0` or behind a public proxy without adding an authentication and authorization layer first.
+
+## Live Observer Local Binding
+
+The noVNC live observer is optional. It starts `x11vnc` against the isolated Xvfb display and serves noVNC through `novnc_proxy` or `websockify`.
+
+Security expectations:
+
+- Observer services bind to `127.0.0.1` by default.
+- The MVP rejects non-local observer hosts.
+- Do not bind live observer services to `0.0.0.0` on shared machines.
+- Use SSH tunnels for remote viewing.
+- `viewOnly` defaults to `true`.
+- If a password is provided, raw password text must not appear in action logs, HTTP responses, MCP responses, or CLI smoke output.
+- Live views may expose sensitive app state, private URLs, source code, tokens, credentials, or customer data.
+- Stop observers after use. Stopping a session stops its observers automatically.
+
+The live observer watches the harness-owned Xvfb session. It must not attach to or control the user's real desktop.
 
 ## MCP Client Trust
 
