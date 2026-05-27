@@ -126,6 +126,7 @@ import type {
 } from "../visual/visualTypes.js";
 import { WindowService } from "../window/WindowService.js";
 import { findBestWindow } from "../window/windowFilters.js";
+import { BrowserSessionHandler } from "./BrowserSessionHandler.js";
 import type { DisplayAllocator } from "./displayAllocator.js";
 import { terminateProcessTree } from "./processTree.js";
 import type { ManagedSession } from "./SessionRegistry.js";
@@ -156,6 +157,7 @@ export class SessionManager {
   private readonly policyValidator: PolicyValidator;
   private readonly screenshotService: ScreenshotService;
   private readonly windowService: WindowService;
+  private readonly browserHandler: BrowserSessionHandler;
   private readonly browserDriver: BrowserDriver;
   private readonly tauriDriver: TauriDriver;
   private readonly electronDriver: ElectronDriver;
@@ -176,6 +178,7 @@ export class SessionManager {
     this.screenshotService = options.screenshotService ?? new ScreenshotService();
     this.windowService = options.windowService ?? new WindowService();
     this.browserDriver = options.browserDriver ?? new PlaywrightBrowserDriver();
+    this.browserHandler = new BrowserSessionHandler(this.registry, this.browserDriver);
     this.tauriDriver = options.tauriDriver ?? new TauriWebDriverDriver();
     this.electronDriver = options.electronDriver ?? new PlaywrightElectronDriver();
     this.visualQaService = options.visualQaService ?? new VisualQaService();
@@ -789,180 +792,46 @@ export class SessionManager {
   }
 
   async openBrowser(sessionId: SessionId, options: BrowserOpenOptions): Promise<BrowserPageRef> {
-    const managed = this.registry.requireManagedSession(sessionId);
-    const session = managed.session;
-    this.registry.ensureRunning(session);
-
-    try {
-      const page = await this.browserDriver.open(session, options);
-      const updatedSession = this.registry.updateManagedSession(managed, {
-        driverKind: "browser",
-      });
-      await this.registry.evidenceStore.writeSession(updatedSession);
-      await this.registry.appendAction(updatedSession, "browser.open", "ok", {
-        pageId: page.pageId,
-        url: page.url,
-        title: page.title,
-        viewport: options.viewport,
-        browserName: options.browserName,
-        browserExecutablePath: options.browserExecutablePath,
-        label: options.label,
-      });
-      return page;
-    } catch (error) {
-      await this.registry.appendFailure(
-        session,
-        "browser.open",
-        {
-          url: options.url,
-          viewport: options.viewport,
-          browserName: options.browserName,
-          browserExecutablePath: options.browserExecutablePath,
-          label: options.label,
-        },
-        error,
-      );
-      throw error;
-    }
+    return await this.browserHandler.open(sessionId, options);
   }
 
   async browserClick(
     sessionId: SessionId,
     options: BrowserClickOptions,
   ): Promise<BrowserActionResult> {
-    return await this.performBrowserAction(
-      sessionId,
-      "browser.click",
-      {
-        ...browserTargetDetails(options),
-        pageId: options.pageId,
-        timeoutMs: options.timeoutMs,
-        label: options.label,
-      },
-      async (session) => await this.browserDriver.click(session, options),
-    );
+    return await this.browserHandler.click(sessionId, options);
   }
 
   async browserFill(
     sessionId: SessionId,
     options: BrowserFillOptions,
   ): Promise<BrowserActionResult> {
-    return await this.performBrowserAction(
-      sessionId,
-      "browser.fill",
-      {
-        ...browserTargetDetails(options),
-        pageId: options.pageId,
-        timeoutMs: options.timeoutMs,
-        redacted: options.secret === true,
-        valueLength: options.value.length,
-        value: options.secret === true ? undefined : truncateForLog(options.value),
-        truncated: options.secret === true ? undefined : options.value.length > 256,
-        label: options.label,
-      },
-      async (session) => await this.browserDriver.fill(session, options),
-      options.secret === true ? options.value : undefined,
-    );
+    return await this.browserHandler.fill(sessionId, options);
   }
 
   async browserPress(
     sessionId: SessionId,
     options: BrowserPressOptions,
   ): Promise<BrowserActionResult> {
-    return await this.performBrowserAction(
-      sessionId,
-      "browser.press",
-      {
-        ...browserTargetDetails(options),
-        pageId: options.pageId,
-        key: options.key,
-        timeoutMs: options.timeoutMs,
-        label: options.label,
-      },
-      async (session) => await this.browserDriver.press(session, options),
-    );
+    return await this.browserHandler.press(sessionId, options);
   }
 
   async browserAssertText(
     sessionId: SessionId,
     options: BrowserAssertTextOptions,
   ): Promise<BrowserActionResult> {
-    return await this.performBrowserAction(
-      sessionId,
-      "browser.assert_text",
-      {
-        pageId: options.pageId,
-        text: options.text,
-        timeoutMs: options.timeoutMs,
-        label: options.label,
-      },
-      async (session) => await this.browserDriver.assertText(session, options),
-    );
+    return await this.browserHandler.assertText(sessionId, options);
   }
 
   async browserScreenshot(
     sessionId: SessionId,
     options: BrowserScreenshotOptions = {},
   ): Promise<ScreenshotResult> {
-    const managed = this.registry.requireManagedSession(sessionId);
-    const session = managed.session;
-    this.registry.ensureRunning(session);
-
-    const sequence = managed.screenshotSequence + 1;
-    const filePath = this.registry.evidenceStore.getScreenshotPath(session, sequence, {
-      label: options.label,
-    });
-
-    try {
-      const result = await this.browserDriver.screenshot(session, filePath, sequence, options);
-      managed.screenshotSequence = sequence;
-      await this.registry.appendAction(session, "screenshot.captured", "ok", {
-        path: result.path,
-        display: result.display,
-        sequence: result.sequence,
-        label: result.label,
-        source: "browser",
-        pageId: options.pageId,
-        fullPage: options.fullPage === true,
-      });
-      await this.registry.appendAction(session, "browser.screenshot", "ok", {
-        path: result.path,
-        sequence: result.sequence,
-        label: result.label,
-        pageId: options.pageId,
-        fullPage: options.fullPage === true,
-      });
-      return result;
-    } catch (error) {
-      await this.registry.appendFailure(
-        session,
-        "browser.screenshot",
-        {
-          sequence,
-          label: options.label,
-          pageId: options.pageId,
-          fullPage: options.fullPage === true,
-        },
-        error,
-      );
-      throw error;
-    }
+    return await this.browserHandler.screenshot(sessionId, options);
   }
 
   async closeBrowser(sessionId: SessionId, pageId?: string): Promise<void> {
-    const managed = this.registry.requireManagedSession(sessionId);
-    const session = managed.session;
-    this.registry.ensureRunning(session);
-
-    try {
-      await this.browserDriver.close(session, pageId);
-      await this.registry.appendAction(session, "browser.close", "ok", {
-        pageId,
-      });
-    } catch (error) {
-      await this.registry.appendFailure(session, "browser.close", { pageId }, error);
-      throw error;
-    }
+    await this.browserHandler.close(sessionId, pageId);
   }
 
   async getTauriDriverStatus(): Promise<TauriDriverStatus> {
@@ -2267,28 +2136,6 @@ export class SessionManager {
     } catch (error) {
       await this.registry.appendFailure(session, type, details, error);
       throw error;
-    }
-  }
-
-  private async performBrowserAction(
-    sessionId: SessionId,
-    type: Extract<ActionLogRecord["type"], `browser.${string}`>,
-    details: Readonly<Record<string, unknown>>,
-    action: (session: DesktopSession) => Promise<BrowserActionResult>,
-    secretValue?: string,
-  ): Promise<BrowserActionResult> {
-    const managed = this.registry.requireManagedSession(sessionId);
-    const session = managed.session;
-    this.registry.ensureRunning(session);
-
-    try {
-      const result = await action(session);
-      await this.registry.appendAction(session, type, "ok", details);
-      return result;
-    } catch (error) {
-      const safeError = secretValue ? redactErrorMessage(error, secretValue) : error;
-      await this.registry.appendFailure(session, type, details, safeError);
-      throw safeError;
     }
   }
 
