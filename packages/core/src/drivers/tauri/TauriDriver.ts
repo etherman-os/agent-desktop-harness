@@ -9,5 +9,5 @@ export type {
   TauriDriverStatus,
   TauriFillOptions,
   TauriOpenOptions,
-  TauriScreenshotOptions
+  TauriScreenshotOptions,
 } from "./tauriTypes.js";

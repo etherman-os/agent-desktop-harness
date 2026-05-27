@@ -10,9 +10,10 @@ import { runSmokeHttp } from "./httpSmoke.js";
 import { runSmokeMcp } from "./mcpSmoke.js";
 import { runObserverStatusCommand, runSmokeObserver } from "./observerSmoke.js";
 import { runSmokeX11 } from "./smoke.js";
+import { runSmokeStudioCaptureContract } from "./studioCaptureContractSmoke.js";
 import { runSmokeTauriDriver } from "./tauriDriverSmoke.js";
-import { runSmokeViteHttp, runSmokeViteMcp } from "./viteSmoke.js";
 import { runSmokeVisualBaseline, runSmokeVisualQa } from "./visualQaSmoke.js";
+import { runSmokeViteHttp, runSmokeViteMcp } from "./viteSmoke.js";
 import { defaultWorkspacePath } from "./workspace.js";
 
 interface StartSessionArgs {
@@ -133,6 +134,15 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (command === "smoke-studio-capture-contract") {
+    const result = await runSmokeStudioCaptureContract(args);
+    console.log(JSON.stringify(result, null, 2));
+    if (!result.ok) {
+      process.exitCode = 1;
+    }
+    return;
+  }
+
   if (command !== undefined) {
     printUsage();
     process.exitCode = 1;
@@ -144,7 +154,9 @@ async function main(): Promise<void> {
 
 function runAnnotateUrl(args: readonly string[]): void {
   const parsed = parseAnnotateUrlArgs(args);
-  const url = new URL(`http://${parsed.host}:${parsed.port}/sessions/${encodeURIComponent(parsed.sessionId)}/annotate`);
+  const url = new URL(
+    `http://${parsed.host}:${parsed.port}/sessions/${encodeURIComponent(parsed.sessionId)}/annotate`,
+  );
   if (parsed.screenshot) {
     url.searchParams.set("screenshot", parsed.screenshot);
   }
@@ -167,7 +179,7 @@ async function runStartSession(args: readonly string[]): Promise<void> {
   const parsed = parseStartSessionArgs(args);
   const manager = new SessionManager();
   const session = await manager.createSession({
-    workspacePath: parsed.workspacePath
+    workspacePath: parsed.workspacePath,
   });
 
   let screenshotPath: string | undefined;
@@ -175,7 +187,7 @@ async function runStartSession(args: readonly string[]): Promise<void> {
   try {
     if (parsed.captureScreenshot) {
       const screenshot = await manager.captureScreenshot(session.id, {
-        label: parsed.screenshotLabel ?? "initial"
+        label: parsed.screenshotLabel ?? "initial",
       });
       screenshotPath = screenshot.path;
     }
@@ -191,11 +203,11 @@ async function runStartSession(args: readonly string[]): Promise<void> {
           display: session.display,
           evidencePath: session.evidencePath,
           screenshotPath,
-          stopped: parsed.once
+          stopped: parsed.once,
         },
         null,
-        2
-      )
+        2,
+      ),
     );
 
     if (!parsed.once) {
@@ -247,7 +259,7 @@ function parseStartSessionArgs(args: readonly string[]): StartSessionArgs {
     workspacePath,
     captureScreenshot,
     screenshotLabel,
-    once
+    once,
   };
 }
 
@@ -310,7 +322,7 @@ function parseAnnotateUrlArgs(args: readonly string[]): AnnotateUrlArgs {
     sessionId,
     host,
     port,
-    screenshot
+    screenshot,
   };
 }
 
@@ -322,11 +334,7 @@ function parsePort(value: string): number {
   return port;
 }
 
-function requireValue(
-  args: readonly string[],
-  index: number,
-  optionName: string
-): string {
+function requireValue(args: readonly string[], index: number, optionName: string): string {
   const value = args[index + 1];
   if (!value) {
     throw new Error(`${optionName} requires a value.`);
@@ -356,6 +364,8 @@ function printUsage(): void {
   agent-desktop-harness smoke-visual-baseline [--workspace DIR] [--vite-port PORT] [--http-port PORT]
                                         [--text TEXT] [--baseline-name NAME] [--suite SUITE]
   agent-desktop-harness smoke-observer [--workspace DIR] [--vnc-port PORT] [--web-port PORT]
+  agent-desktop-harness smoke-studio-capture-contract [--workspace DIR] [--output FILE] [--title TITLE]
+                                                      [--port PORT] [--width PX] [--height PX]
 
 Examples:
   pnpm --filter @agent-desktop-harness/cli dev -- start-session --screenshot --once
@@ -375,6 +385,7 @@ Examples:
   pnpm --filter @agent-desktop-harness/cli dev -- smoke-visual-qa
   pnpm --filter @agent-desktop-harness/cli dev -- smoke-visual-baseline
   pnpm --filter @agent-desktop-harness/cli dev -- smoke-observer
+  pnpm --filter @agent-desktop-harness/cli dev -- smoke-studio-capture-contract
 `);
 }
 

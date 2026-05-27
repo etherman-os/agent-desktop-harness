@@ -1,12 +1,16 @@
-import { access } from "node:fs/promises";
 import { constants } from "node:fs";
+import { access } from "node:fs/promises";
 import { join } from "node:path";
-import { SessionManager } from "@agent-desktop-harness/core";
 import type { ElectronDriverStatus } from "@agent-desktop-harness/core";
+import { SessionManager } from "@agent-desktop-harness/core";
 import type { DoctorReport } from "./doctor.js";
-import { formatMissingRequiredMessage, getMissingRequiredDependencies, runDoctor } from "./doctor.js";
-import { parseCommandLine } from "./tauriDriverSmoke.js";
+import {
+  formatMissingRequiredMessage,
+  getMissingRequiredDependencies,
+  runDoctor,
+} from "./doctor.js";
 import { repoRootPath } from "./repo.js";
+import { parseCommandLine } from "./tauriDriverSmoke.js";
 import { defaultWorkspacePath } from "./workspace.js";
 
 const SAMPLE_ELECTRON_APP_PATH = "examples/sample-electron-app";
@@ -51,16 +55,15 @@ export interface SmokeElectronDriverOptions {
 
 export async function runSmokeElectronDriver(
   args: readonly string[],
-  options: SmokeElectronDriverOptions = {}
+  options: SmokeElectronDriverOptions = {},
 ): Promise<SmokeElectronDriverResult> {
   const env = options.env ?? process.env;
   const parsed = await resolveSmokeElectronDriverConfig(
     parseSmokeElectronDriverArgs(args, env),
-    options.sampleElectronBinaryPath
+    options.sampleElectronBinaryPath,
   );
   const report =
-    options.doctorReport ??
-    (await (options.runDoctor ?? (async () => await runDoctor()))());
+    options.doctorReport ?? (await (options.runDoctor ?? (async () => await runDoctor()))());
   ensureElectronDriverSmokeReady(report);
 
   const manager = options.sessionManager ?? new SessionManager();
@@ -68,13 +71,13 @@ export async function runSmokeElectronDriver(
   if (!status.available) {
     return skippedResult(
       status,
-      "Playwright Electron API is unavailable; Electron semantic smoke cannot run."
+      "Playwright Electron API is unavailable; Electron semantic smoke cannot run.",
     );
   }
   if (!parsed.command && !parsed.executablePath) {
     return skippedResult(
       status,
-      "No Electron app configured and sample Electron app dependency is not installed. Run pnpm install or set AGENT_DESKTOP_HARNESS_ELECTRON_COMMAND."
+      "No Electron app configured and sample Electron app dependency is not installed. Run pnpm install or set AGENT_DESKTOP_HARNESS_ELECTRON_COMMAND.",
     );
   }
 
@@ -87,8 +90,8 @@ export async function runSmokeElectronDriver(
     const session = await manager.createSession({
       workspacePath: parsed.workspacePath,
       policy: {
-        allowedCommands
-      }
+        allowedCommands,
+      },
     });
     sessionId = session.id;
 
@@ -101,13 +104,13 @@ export async function runSmokeElectronDriver(
       timeoutMs: parsed.timeoutMs,
       windowTitleIncludes: parsed.windowTitleIncludes,
       excludeDevtools: true,
-      label: "electron-driver-smoke"
+      label: "electron-driver-smoke",
     });
 
     const initialScreenshot = await manager.electronScreenshot(session.id, {
       appId: app.appId,
       label: "electron-driver-initial",
-      fullPage: false
+      fullPage: false,
     });
 
     let semanticAsserted = false;
@@ -116,39 +119,39 @@ export async function runSmokeElectronDriver(
         appId: app.appId,
         placeholder: "Type a message",
         value: parsed.text,
-        timeoutMs: parsed.timeoutMs
+        timeoutMs: parsed.timeoutMs,
       });
       await manager.electronClick(session.id, {
         appId: app.appId,
         role: "button",
         name: "Save message",
         timeoutMs: parsed.timeoutMs,
-        label: "electron-driver-click-save"
+        label: "electron-driver-click-save",
       });
       const saved = await manager.electronAssertText(session.id, {
         appId: app.appId,
         text: "Status: saved",
         timeoutMs: parsed.timeoutMs,
-        label: "electron-driver-assert-saved"
+        label: "electron-driver-assert-saved",
       });
       await manager.electronAssertText(session.id, {
         appId: app.appId,
         text: parsed.text,
         timeoutMs: parsed.timeoutMs,
-        label: "electron-driver-assert-message"
+        label: "electron-driver-assert-message",
       });
       await manager.electronClick(session.id, {
         appId: app.appId,
         role: "button",
         name: "Open details",
         timeoutMs: parsed.timeoutMs,
-        label: "electron-driver-click-details"
+        label: "electron-driver-click-details",
       });
       const details = await manager.electronAssertText(session.id, {
         appId: app.appId,
         text: "Details panel is open",
         timeoutMs: parsed.timeoutMs,
-        label: "electron-driver-assert-details"
+        label: "electron-driver-assert-details",
       });
       semanticAsserted = saved.success && details.success;
     }
@@ -156,7 +159,7 @@ export async function runSmokeElectronDriver(
     const detailsScreenshot = await manager.electronScreenshot(session.id, {
       appId: app.appId,
       label: "electron-driver-details-open",
-      fullPage: false
+      fullPage: false,
     });
 
     await manager.closeElectronApp(session.id, app.appId);
@@ -176,7 +179,7 @@ export async function runSmokeElectronDriver(
       screenshots: [initialScreenshot.path, detailsScreenshot.path],
       semanticAsserted,
       cleanupSucceeded: true,
-      stopped
+      stopped,
     };
   } finally {
     if (sessionId && !stopped) {
@@ -187,15 +190,15 @@ export async function runSmokeElectronDriver(
         cleanupError = error;
       }
     }
-    if (cleanupError) {
-      throw cleanupError;
-    }
+  }
+  if (cleanupError) {
+    throw cleanupError;
   }
 }
 
 export function parseSmokeElectronDriverArgs(
   args: readonly string[],
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
 ): SmokeElectronDriverArgs {
   let workspacePath = env.AGENT_DESKTOP_HARNESS_ELECTRON_CWD ?? defaultWorkspacePath();
   let cwd = env.AGENT_DESKTOP_HARNESS_ELECTRON_CWD;
@@ -290,13 +293,13 @@ export function parseSmokeElectronDriverArgs(
     appPath,
     windowTitleIncludes,
     text,
-    timeoutMs
+    timeoutMs,
   };
 }
 
 export async function resolveSmokeElectronDriverConfig(
   parsed: SmokeElectronDriverArgs,
-  sampleElectronBinaryPath = defaultSampleElectronBinaryPath()
+  sampleElectronBinaryPath = defaultSampleElectronBinaryPath(),
 ): Promise<SmokeElectronDriverArgs> {
   if (parsed.command || parsed.executablePath) {
     return parsed;
@@ -313,7 +316,7 @@ export async function resolveSmokeElectronDriverConfig(
     cwd: samplePath,
     command: sampleElectronBinaryPath,
     args: ["."],
-    windowTitleIncludes: parsed.windowTitleIncludes ?? "Agent Desktop Harness Electron Demo"
+    windowTitleIncludes: parsed.windowTitleIncludes ?? "Agent Desktop Harness Electron Demo",
   };
 }
 
@@ -329,13 +332,13 @@ function skippedResult(status: ElectronDriverStatus, reason: string): SmokeElect
     reason,
     status,
     cleanupSucceeded: true,
-    stopped: true
+    stopped: true,
   };
 }
 
 function normalizeSmokeElectronStatus(
   status: ElectronDriverStatus,
-  parsed: SmokeElectronDriverArgs
+  parsed: SmokeElectronDriverArgs,
 ): ElectronDriverStatus {
   if (status.electronBinaryPath || !parsed.command?.includes("/")) {
     return status;
@@ -345,8 +348,8 @@ function normalizeSmokeElectronStatus(
     ...status,
     electronBinaryPath: parsed.command,
     warnings: status.warnings.filter(
-      (warning) => !warning.includes("No electron binary was found")
-    )
+      (warning) => !warning.includes("No electron binary was found"),
+    ),
   };
 }
 
@@ -363,11 +366,7 @@ async function isExecutable(path: string): Promise<boolean> {
   }
 }
 
-function requireValue(
-  args: readonly string[],
-  index: number,
-  optionName: string
-): string {
+function requireValue(args: readonly string[], index: number, optionName: string): string {
   const value = args[index + 1];
   if (!value) {
     throw new Error(`${optionName} requires a value.`);

@@ -1,16 +1,7 @@
-import type {
-  BrowserFillOptions,
-  BrowserSelectorTarget
-} from "./browserTypes.js";
 import { ProcessError } from "../../errors.js";
+import type { BrowserFillOptions, BrowserSelectorTarget } from "./browserTypes.js";
 
-export type BrowserSelectorKind =
-  | "selector"
-  | "testId"
-  | "role"
-  | "label"
-  | "placeholder"
-  | "text";
+export type BrowserSelectorKind = "selector" | "testId" | "role" | "label" | "placeholder" | "text";
 
 export interface BrowserResolvedTarget {
   readonly kind: BrowserSelectorKind;
@@ -24,12 +15,10 @@ const TARGET_PRIORITY: readonly BrowserSelectorKind[] = [
   "role",
   "label",
   "placeholder",
-  "text"
+  "text",
 ];
 
-export function resolveBrowserTarget(
-  target: BrowserSelectorTarget
-): BrowserResolvedTarget {
+export function resolveBrowserTarget(target: BrowserSelectorTarget): BrowserResolvedTarget {
   if (isNonEmpty(target.selector)) {
     return { kind: "selector", value: target.selector };
   }
@@ -40,7 +29,7 @@ export function resolveBrowserTarget(
     return {
       kind: "role",
       value: target.role,
-      name: isNonEmpty(target.name) ? target.name : undefined
+      name: isNonEmpty(target.name) ? target.name : undefined,
     };
   }
   if (isNonEmpty(target.label)) {
@@ -53,9 +42,7 @@ export function resolveBrowserTarget(
     return { kind: "text", value: target.text };
   }
 
-  throw new ProcessError(
-    `Browser action requires one target: ${TARGET_PRIORITY.join(", ")}.`
-  );
+  throw new ProcessError(`Browser action requires one target: ${TARGET_PRIORITY.join(", ")}.`);
 }
 
 export function hasBrowserTarget(target: BrowserSelectorTarget): boolean {
@@ -67,12 +54,12 @@ export function formatBrowserTarget(target: BrowserSelectorTarget): Record<strin
   return {
     kind: resolved.kind,
     value: resolved.value,
-    name: resolved.name
+    name: resolved.name,
   };
 }
 
 export function makeBrowserFillDetails(
-  options: BrowserFillOptions
+  options: BrowserFillOptions,
 ): Readonly<Record<string, unknown>> {
   return {
     target: formatBrowserTarget(options),
@@ -80,16 +67,14 @@ export function makeBrowserFillDetails(
     valueLength: options.value.length,
     value: options.secret === true ? undefined : truncateForLog(options.value),
     truncated: options.secret === true ? undefined : options.value.length > 256,
-    label: options.label
+    label: options.label,
   };
 }
 
 export function compactDetails(
-  details: Readonly<Record<string, unknown>>
+  details: Readonly<Record<string, unknown>>,
 ): Readonly<Record<string, unknown>> {
-  return Object.fromEntries(
-    Object.entries(details).filter(([, value]) => value !== undefined)
-  );
+  return Object.fromEntries(Object.entries(details).filter(([, value]) => value !== undefined));
 }
 
 function isNonEmpty(value: string | undefined): value is string {

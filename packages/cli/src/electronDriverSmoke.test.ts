@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { DoctorReport } from "./doctor.js";
 import {
   ensureElectronDriverSmokeReady,
   parseSmokeElectronDriverArgs,
-  resolveSmokeElectronDriverConfig
+  resolveSmokeElectronDriverConfig,
 } from "./electronDriverSmoke.js";
-import type { DoctorReport } from "./doctor.js";
 
 test("parseSmokeElectronDriverArgs uses environment-driven Electron app config", () => {
   const parsed = parseSmokeElectronDriverArgs([], {
@@ -16,7 +16,7 @@ test("parseSmokeElectronDriverArgs uses environment-driven Electron app config",
     AGENT_DESKTOP_HARNESS_ELECTRON_APP_PATH: "/tmp/electron-app/main.js",
     AGENT_DESKTOP_HARNESS_ELECTRON_WINDOW_TITLE: "Demo",
     AGENT_DESKTOP_HARNESS_ELECTRON_TEXT: "hello electron",
-    AGENT_DESKTOP_HARNESS_ELECTRON_TIMEOUT_MS: "12000"
+    AGENT_DESKTOP_HARNESS_ELECTRON_TIMEOUT_MS: "12000",
   });
 
   assert.equal(parsed.command, "electron");
@@ -48,11 +48,11 @@ test("parseSmokeElectronDriverArgs lets CLI options override env", () => {
       "--text",
       "override message",
       "--timeout-ms",
-      "10000"
+      "10000",
     ],
     {
-      AGENT_DESKTOP_HARNESS_ELECTRON_COMMAND: "electron old.js"
-    }
+      AGENT_DESKTOP_HARNESS_ELECTRON_COMMAND: "electron old.js",
+    },
   );
 
   assert.equal(parsed.command, "electron");
@@ -69,7 +69,7 @@ test("parseSmokeElectronDriverArgs lets CLI options override env", () => {
 test("resolveSmokeElectronDriverConfig uses sample app when no env app is configured", async () => {
   const parsed = await resolveSmokeElectronDriverConfig(
     parseSmokeElectronDriverArgs([], {}),
-    process.execPath
+    process.execPath,
   );
 
   assert.equal(parsed.command, process.execPath);
@@ -81,7 +81,7 @@ test("resolveSmokeElectronDriverConfig uses sample app when no env app is config
 test("resolveSmokeElectronDriverConfig preserves explicit app config", async () => {
   const parsed = await resolveSmokeElectronDriverConfig(
     parseSmokeElectronDriverArgs(["--command", "electron ."], {}),
-    process.execPath
+    process.execPath,
   );
 
   assert.equal(parsed.command, "electron");
@@ -97,13 +97,13 @@ test("ensureElectronDriverSmokeReady fails when required desktop dependencies ar
         name: "Xvfb",
         level: "required",
         installHint: "sudo apt install -y xvfb",
-        found: false
-      }
-    ]
+        found: false,
+      },
+    ],
   };
 
   assert.throws(
     () => ensureElectronDriverSmokeReady(report),
-    /Missing required dependencies: Xvfb/
+    /Missing required dependencies: Xvfb/,
   );
 });

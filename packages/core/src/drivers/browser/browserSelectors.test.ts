@@ -1,10 +1,10 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import {
   formatBrowserTarget,
   hasBrowserTarget,
   makeBrowserFillDetails,
-  resolveBrowserTarget
+  resolveBrowserTarget,
 } from "./browserSelectors.js";
 
 test("resolveBrowserTarget follows selector priority", () => {
@@ -12,25 +12,25 @@ test("resolveBrowserTarget follows selector priority", () => {
     resolveBrowserTarget({
       selector: "#save",
       role: "button",
-      name: "Save message"
+      name: "Save message",
     }),
     {
       kind: "selector",
-      value: "#save"
-    }
+      value: "#save",
+    },
   );
 
   assert.deepEqual(
     resolveBrowserTarget({
       role: "button",
       name: "Save message",
-      text: "Save message"
+      text: "Save message",
     }),
     {
       kind: "role",
       value: "button",
-      name: "Save message"
-    }
+      name: "Save message",
+    },
   );
 });
 
@@ -43,12 +43,12 @@ test("formatBrowserTarget supports label and placeholder targets", () => {
   assert.deepEqual(formatBrowserTarget({ label: "Message" }), {
     kind: "label",
     value: "Message",
-    name: undefined
+    name: undefined,
   });
   assert.deepEqual(formatBrowserTarget({ placeholder: "Type a message" }), {
     kind: "placeholder",
     value: "Type a message",
-    name: undefined
+    name: undefined,
   });
 });
 
@@ -56,7 +56,7 @@ test("makeBrowserFillDetails redacts secret values", () => {
   const details = makeBrowserFillDetails({
     placeholder: "Type a message",
     value: "super-secret",
-    secret: true
+    secret: true,
   });
 
   assert.equal(details.redacted, true);

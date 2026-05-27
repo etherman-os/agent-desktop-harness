@@ -1,8 +1,4 @@
-import type {
-  DesktopSession,
-  ScreenshotResult,
-  SessionId
-} from "../../types.js";
+import type { DesktopSession, ScreenshotResult, SessionId } from "../../types.js";
 
 export type TauriDriverMode = "webdriver" | "x11-fallback";
 
@@ -90,15 +86,12 @@ export interface TauriDriver {
   open(session: DesktopSession, options: TauriOpenOptions): Promise<TauriAppRef>;
   click(session: DesktopSession, options: TauriClickOptions): Promise<TauriActionResult>;
   fill(session: DesktopSession, options: TauriFillOptions): Promise<TauriActionResult>;
-  assertText(
-    session: DesktopSession,
-    options: TauriAssertTextOptions
-  ): Promise<TauriActionResult>;
+  assertText(session: DesktopSession, options: TauriAssertTextOptions): Promise<TauriActionResult>;
   screenshot(
     session: DesktopSession,
     filePath: string,
     sequence: number,
-    options: TauriScreenshotOptions
+    options: TauriScreenshotOptions,
   ): Promise<ScreenshotResult | undefined>;
   close(session: DesktopSession, appId?: string): Promise<void>;
   closeAll(sessionId: SessionId): Promise<void>;

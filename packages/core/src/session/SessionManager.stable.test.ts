@@ -1,19 +1,10 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { DisplayAllocator } from "./displayAllocator.js";
-import {
-  fingerprintsMatch,
-  SessionManager
-} from "./SessionManager.js";
-import { EvidenceStore } from "../evidence/EvidenceStore.js";
-import { LiveObserverService } from "../observer/LiveObserverService.js";
-import { WindowService } from "../window/WindowService.js";
+import { join } from "node:path";
+import test from "node:test";
 import type { XvfbDisplayOptions } from "../display/XvfbDisplay.js";
-import type { WindowBackend } from "../window/types.js";
 import type {
   BrowserActionResult,
   BrowserAssertTextOptions,
@@ -23,53 +14,53 @@ import type {
   BrowserOpenOptions,
   BrowserPageRef,
   BrowserPressOptions,
-  BrowserScreenshotOptions
+  BrowserScreenshotOptions,
 } from "../drivers/browser/browserTypes.js";
 import type {
-  TauriActionResult,
-  TauriAssertTextOptions,
-  TauriClickOptions,
-  TauriDriver,
-  TauriDriverStatus,
-  TauriFillOptions,
-  TauriOpenOptions,
-  TauriAppRef,
-  TauriScreenshotOptions
-} from "../drivers/tauri/tauriTypes.js";
-import type {
   ElectronActionResult,
+  ElectronAppRef,
   ElectronAssertTextOptions,
   ElectronClickOptions,
   ElectronDriver,
   ElectronDriverStatus,
   ElectronFillOptions,
   ElectronOpenOptions,
-  ElectronAppRef,
   ElectronPressOptions,
-  ElectronScreenshotOptions
+  ElectronScreenshotOptions,
 } from "../drivers/electron/electronTypes.js";
+import type {
+  TauriActionResult,
+  TauriAppRef,
+  TauriAssertTextOptions,
+  TauriClickOptions,
+  TauriDriver,
+  TauriDriverStatus,
+  TauriFillOptions,
+  TauriOpenOptions,
+  TauriScreenshotOptions,
+} from "../drivers/tauri/tauriTypes.js";
+import { EvidenceStore } from "../evidence/EvidenceStore.js";
+import { LiveObserverService } from "../observer/LiveObserverService.js";
 import type {
   DesktopSession,
   FocusWindowTarget,
   ScreenshotOptions,
   ScreenshotResult,
   WindowActionResult,
-  WindowInfo
+  WindowInfo,
 } from "../types.js";
+import type { WindowBackend } from "../window/types.js";
+import { WindowService } from "../window/WindowService.js";
+import { DisplayAllocator } from "./displayAllocator.js";
+import { fingerprintsMatch, SessionManager } from "./SessionManager.js";
 
 test("fingerprintsMatch supports tolerant file-size comparison", () => {
-  assert.equal(
-    fingerprintsMatch({ size: 100 }, { size: 108 }, "tolerant", 10),
-    true
-  );
-  assert.equal(
-    fingerprintsMatch({ size: 100 }, { size: 120 }, "tolerant", 10),
-    false
-  );
+  assert.equal(fingerprintsMatch({ size: 100 }, { size: 108 }, "tolerant", 10), true);
+  assert.equal(fingerprintsMatch({ size: 100 }, { size: 120 }, "tolerant", 10), false);
   assert.equal(fingerprintsMatch({ size: 100 }, { size: 100 }, "fileSize"), true);
   assert.equal(
     fingerprintsMatch({ size: 100, hash: "a" }, { size: 100, hash: "b" }, "hash"),
-    false
+    false,
   );
 });
 
@@ -78,7 +69,7 @@ test("waitForStableScreen retains only the last stable-check screenshot when req
   const evidenceStore = new EvidenceStore();
   const manager = makeManager({
     evidenceStore,
-    screenshotService: new MockScreenshotService([100, 104])
+    screenshotService: new MockScreenshotService([100, 104]),
   });
 
   try {
@@ -90,7 +81,7 @@ test("waitForStableScreen retains only the last stable-check screenshot when req
       stableChecks: 1,
       intervalMs: 1,
       timeoutMs: 1000,
-      label: "stable-test"
+      label: "stable-test",
     });
 
     assert.equal(result.stable, true);
@@ -100,12 +91,8 @@ test("waitForStableScreen retains only the last stable-check screenshot when req
     assert.equal(result.retainedScreenshots?.length, 1);
 
     const paths = evidenceStore.getPaths(workspacePath, session.id);
-    assert.deepEqual(await readdir(paths.screenshotsPath), [
-      "0002-stable-test-0002.png"
-    ]);
-    assert.deepEqual(await readdir(paths.transientPath), [
-      "0001-stable-test-0001.png"
-    ]);
+    assert.deepEqual(await readdir(paths.screenshotsPath), ["0002-stable-test-0002.png"]);
+    assert.deepEqual(await readdir(paths.transientPath), ["0001-stable-test-0001.png"]);
 
     await evidenceStore.writeReport(manager.getSession(session.id)!);
     const report = await readFile(paths.reportPath, "utf8");
@@ -127,17 +114,17 @@ test("waitForWindow returns the best matching non-devtools window", async () => 
             id: "0x01",
             title: "DevTools - Demo App",
             width: 1200,
-            height: 900
+            height: 900,
           },
           {
             id: "0x02",
             title: "Demo App",
             width: 900,
-            height: 700
-          }
-        ]
-      ])
-    })
+            height: 700,
+          },
+        ],
+      ]),
+    }),
   });
 
   try {
@@ -147,7 +134,7 @@ test("waitForWindow returns the best matching non-devtools window", async () => 
       excludeDevtools: true,
       preferLargest: true,
       timeoutMs: 1000,
-      intervalMs: 1
+      intervalMs: 1,
     });
 
     assert.equal(window.id, "0x02");
@@ -160,8 +147,8 @@ test("waitForWindow fails clearly on timeout", async () => {
   const workspacePath = await mkdtemp(join(tmpdir(), "agent-desktop-harness-window-timeout-"));
   const manager = makeManager({
     windowService: new WindowService({
-      backend: new MockWindowBackend([[]])
-    })
+      backend: new MockWindowBackend([[]]),
+    }),
   });
 
   try {
@@ -171,9 +158,9 @@ test("waitForWindow fails clearly on timeout", async () => {
         await manager.waitForWindow(session.id, {
           titleIncludes: "Missing",
           timeoutMs: 5,
-          intervalMs: 1
+          intervalMs: 1,
         }),
-      /No matching window appeared/
+      /No matching window appeared/,
     );
   } finally {
     await rm(workspacePath, { recursive: true, force: true });
@@ -188,7 +175,7 @@ test("stopSession closes browser resources before process cleanup completes", as
   try {
     const session = await manager.createSession({ workspacePath });
     await manager.openBrowser(session.id, {
-      url: "http://127.0.0.1:5179"
+      url: "http://127.0.0.1:5179",
     });
     await manager.stopSession(session.id);
 
@@ -208,7 +195,7 @@ test("openApp tracks browser app refs and delegates routed actions", async () =>
     const app = await manager.openApp(session.id, {
       appKind: "browser",
       url: "http://127.0.0.1:5179",
-      requireSemantic: true
+      requireSemantic: true,
     });
 
     assert.equal(app.selectedDriver, "browser-playwright");
@@ -217,7 +204,7 @@ test("openApp tracks browser app refs and delegates routed actions", async () =>
     const result = await manager.appClick(session.id, {
       appId: app.appId,
       role: "button",
-      name: "Save message"
+      name: "Save message",
     });
 
     assert.equal(result.appId, app.appId);
@@ -237,7 +224,7 @@ test("stopSession closes routed browser app resources", async () => {
     const session = await manager.createSession({ workspacePath });
     await manager.openApp(session.id, {
       appKind: "browser",
-      url: "http://127.0.0.1:5179"
+      url: "http://127.0.0.1:5179",
     });
     await manager.stopSession(session.id);
 
@@ -257,12 +244,12 @@ test("stopSession closes Tauri resources before process cleanup completes", asyn
     const session = await manager.createSession({
       workspacePath,
       policy: {
-        allowedCommands: ["pnpm"]
-      }
+        allowedCommands: ["pnpm"],
+      },
     });
     await manager.openTauriApp(session.id, {
       command: "pnpm",
-      args: ["tauri", "dev"]
+      args: ["tauri", "dev"],
     });
     await manager.stopSession(session.id);
 
@@ -281,12 +268,12 @@ test("stopSession closes Electron resources before process cleanup completes", a
     const session = await manager.createSession({
       workspacePath,
       policy: {
-        allowedCommands: ["electron"]
-      }
+        allowedCommands: ["electron"],
+      },
     });
     await manager.openElectronApp(session.id, {
       command: "electron",
-      args: ["."]
+      args: ["."],
     });
     await manager.stopSession(session.id);
 
@@ -311,20 +298,22 @@ test("stopSession stops live observers before display cleanup completes", async 
   }
 });
 
-function makeManager(options: {
-  readonly evidenceStore?: EvidenceStore;
-  readonly screenshotService?: MockScreenshotService;
-  readonly windowService?: WindowService;
-  readonly browserDriver?: BrowserDriver;
-  readonly tauriDriver?: TauriDriver;
-  readonly electronDriver?: ElectronDriver;
-  readonly liveObserverService?: LiveObserverService;
-} = {}): SessionManager {
+function makeManager(
+  options: {
+    readonly evidenceStore?: EvidenceStore;
+    readonly screenshotService?: MockScreenshotService;
+    readonly windowService?: WindowService;
+    readonly browserDriver?: BrowserDriver;
+    readonly tauriDriver?: TauriDriver;
+    readonly electronDriver?: ElectronDriver;
+    readonly liveObserverService?: LiveObserverService;
+  } = {},
+): SessionManager {
   return new SessionManager({
     displayAllocator: new DisplayAllocator({
       min: 191,
       max: 191,
-      isDisplayInUse: () => false
+      isDisplayInUse: () => false,
     }),
     displayBackend: {
       start: async ({ display, width, height, depth }: XvfbDisplayOptions) => ({
@@ -333,8 +322,8 @@ function makeManager(options: {
         height,
         depth,
         xvfbProcess: { pid: 1000 } as ChildProcess,
-        warnings: []
-      })
+        warnings: [],
+      }),
     } as never,
     evidenceStore: options.evidenceStore,
     screenshotService: options.screenshotService as never,
@@ -342,7 +331,7 @@ function makeManager(options: {
     browserDriver: options.browserDriver,
     tauriDriver: options.tauriDriver,
     electronDriver: options.electronDriver,
-    liveObserverService: options.liveObserverService
+    liveObserverService: options.liveObserverService,
   });
 }
 
@@ -365,7 +354,7 @@ class MockScreenshotService {
     session: DesktopSession,
     filePath: string,
     sequence: number,
-    options: ScreenshotOptions = {}
+    options: ScreenshotOptions = {},
   ): Promise<ScreenshotResult> {
     const size = this.sizes[Math.min(this.index, this.sizes.length - 1)] ?? 100;
     this.index += 1;
@@ -381,7 +370,7 @@ class MockScreenshotService {
       createdAt,
       display: session.display,
       sequence,
-      label: options.label
+      label: options.label,
     };
   }
 }
@@ -392,22 +381,21 @@ class MockWindowBackend implements WindowBackend {
   constructor(private readonly windowsByCall: readonly (readonly WindowInfo[])[]) {}
 
   async getWindows(): Promise<WindowInfo[]> {
-    const windows =
-      this.windowsByCall[Math.min(this.index, this.windowsByCall.length - 1)] ?? [];
+    const windows = this.windowsByCall[Math.min(this.index, this.windowsByCall.length - 1)] ?? [];
     this.index += 1;
     return [...windows];
   }
 
   async focusWindow(
     session: DesktopSession,
-    target: FocusWindowTarget
+    target: FocusWindowTarget,
   ): Promise<WindowActionResult> {
     const windows = await this.getWindows();
     return {
       sessionId: session.id,
       success: true,
       window: windows.find((window) => window.id === target.id),
-      createdAt: "2026-01-01T00:00:00.000Z"
+      createdAt: "2026-01-01T00:00:00.000Z",
     };
   }
 }
@@ -423,37 +411,31 @@ class MockBrowserDriver implements BrowserDriver {
       pageId: "page-1",
       url: options.url,
       title: "Mock Page",
-      createdAt: "2026-01-01T00:00:00.000Z"
+      createdAt: "2026-01-01T00:00:00.000Z",
     };
   }
 
-  async click(
-    session: DesktopSession,
-    options: BrowserClickOptions
-  ): Promise<BrowserActionResult> {
+  async click(session: DesktopSession, options: BrowserClickOptions): Promise<BrowserActionResult> {
     if (options.pageId) {
       this.clickedPageIds.push(options.pageId);
     }
     return makeBrowserResult(session, "browser.click");
   }
 
-  async fill(
-    session: DesktopSession,
-    _options: BrowserFillOptions
-  ): Promise<BrowserActionResult> {
+  async fill(session: DesktopSession, _options: BrowserFillOptions): Promise<BrowserActionResult> {
     return makeBrowserResult(session, "browser.fill");
   }
 
   async press(
     session: DesktopSession,
-    _options: BrowserPressOptions
+    _options: BrowserPressOptions,
   ): Promise<BrowserActionResult> {
     return makeBrowserResult(session, "browser.press");
   }
 
   async assertText(
     session: DesktopSession,
-    _options: BrowserAssertTextOptions
+    _options: BrowserAssertTextOptions,
   ): Promise<BrowserActionResult> {
     return makeBrowserResult(session, "browser.assert_text");
   }
@@ -462,7 +444,7 @@ class MockBrowserDriver implements BrowserDriver {
     session: DesktopSession,
     filePath: string,
     sequence: number,
-    options: BrowserScreenshotOptions
+    options: BrowserScreenshotOptions,
   ): Promise<ScreenshotResult> {
     await writeFile(filePath, Buffer.alloc(100, 1));
     const createdAt = new Date("2026-01-01T00:00:00.000Z");
@@ -476,7 +458,7 @@ class MockBrowserDriver implements BrowserDriver {
       createdAt,
       display: session.display,
       sequence,
-      label: options.label
+      label: options.label,
     };
   }
 
@@ -492,16 +474,13 @@ class MockBrowserDriver implements BrowserDriver {
   }
 }
 
-function makeBrowserResult(
-  session: DesktopSession,
-  actionType: string
-): BrowserActionResult {
+function makeBrowserResult(session: DesktopSession, actionType: string): BrowserActionResult {
   return {
     sessionId: session.id,
     pageId: "page-1",
     actionType,
     success: true,
-    createdAt: "2026-01-01T00:00:00.000Z"
+    createdAt: "2026-01-01T00:00:00.000Z",
   };
 }
 
@@ -512,7 +491,7 @@ class MockTauriDriver implements TauriDriver {
     return {
       available: false,
       warnings: [],
-      errors: ["tauri-driver is missing."]
+      errors: ["tauri-driver is missing."],
     };
   }
 
@@ -523,27 +502,21 @@ class MockTauriDriver implements TauriDriver {
       processId: 2000,
       createdAt: "2026-01-01T00:00:00.000Z",
       mode: "x11-fallback",
-      warnings: ["fallback"]
+      warnings: ["fallback"],
     };
   }
 
-  async click(
-    session: DesktopSession,
-    _options: TauriClickOptions
-  ): Promise<TauriActionResult> {
+  async click(session: DesktopSession, _options: TauriClickOptions): Promise<TauriActionResult> {
     return makeTauriResult(session, "tauri.click");
   }
 
-  async fill(
-    session: DesktopSession,
-    _options: TauriFillOptions
-  ): Promise<TauriActionResult> {
+  async fill(session: DesktopSession, _options: TauriFillOptions): Promise<TauriActionResult> {
     return makeTauriResult(session, "tauri.fill");
   }
 
   async assertText(
     session: DesktopSession,
-    _options: TauriAssertTextOptions
+    _options: TauriAssertTextOptions,
   ): Promise<TauriActionResult> {
     return makeTauriResult(session, "tauri.assert_text");
   }
@@ -552,7 +525,7 @@ class MockTauriDriver implements TauriDriver {
     _session: DesktopSession,
     _filePath: string,
     _sequence: number,
-    _options: TauriScreenshotOptions
+    _options: TauriScreenshotOptions,
   ): Promise<ScreenshotResult | undefined> {
     return undefined;
   }
@@ -566,17 +539,14 @@ class MockTauriDriver implements TauriDriver {
   }
 }
 
-function makeTauriResult(
-  session: DesktopSession,
-  actionType: string
-): TauriActionResult {
+function makeTauriResult(session: DesktopSession, actionType: string): TauriActionResult {
   return {
     sessionId: session.id,
     appId: "tauri-app-1",
     actionType,
     success: false,
     mode: "x11-fallback",
-    createdAt: "2026-01-01T00:00:00.000Z"
+    createdAt: "2026-01-01T00:00:00.000Z",
   };
 }
 
@@ -588,7 +558,7 @@ class MockElectronDriver implements ElectronDriver {
       available: true,
       playwrightAvailable: true,
       warnings: [],
-      errors: []
+      errors: [],
     };
   }
 
@@ -599,34 +569,34 @@ class MockElectronDriver implements ElectronDriver {
       processId: 3000,
       createdAt: "2026-01-01T00:00:00.000Z",
       mode: "playwright-electron",
-      windowTitle: "Mock Electron"
+      windowTitle: "Mock Electron",
     };
   }
 
   async click(
     session: DesktopSession,
-    _options: ElectronClickOptions
+    _options: ElectronClickOptions,
   ): Promise<ElectronActionResult> {
     return makeElectronResult(session, "electron.click");
   }
 
   async fill(
     session: DesktopSession,
-    _options: ElectronFillOptions
+    _options: ElectronFillOptions,
   ): Promise<ElectronActionResult> {
     return makeElectronResult(session, "electron.fill");
   }
 
   async press(
     session: DesktopSession,
-    _options: ElectronPressOptions
+    _options: ElectronPressOptions,
   ): Promise<ElectronActionResult> {
     return makeElectronResult(session, "electron.press");
   }
 
   async assertText(
     session: DesktopSession,
-    _options: ElectronAssertTextOptions
+    _options: ElectronAssertTextOptions,
   ): Promise<ElectronActionResult> {
     return makeElectronResult(session, "electron.assert_text");
   }
@@ -635,7 +605,7 @@ class MockElectronDriver implements ElectronDriver {
     _session: DesktopSession,
     _filePath: string,
     _sequence: number,
-    _options: ElectronScreenshotOptions
+    _options: ElectronScreenshotOptions,
   ): Promise<ScreenshotResult | undefined> {
     return undefined;
   }
@@ -649,16 +619,13 @@ class MockElectronDriver implements ElectronDriver {
   }
 }
 
-function makeElectronResult(
-  session: DesktopSession,
-  actionType: string
-): ElectronActionResult {
+function makeElectronResult(session: DesktopSession, actionType: string): ElectronActionResult {
   return {
     sessionId: session.id,
     appId: "electron-app-1",
     actionType,
     success: true,
     mode: "playwright-electron",
-    createdAt: "2026-01-01T00:00:00.000Z"
+    createdAt: "2026-01-01T00:00:00.000Z",
   };
 }

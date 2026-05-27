@@ -1,6 +1,7 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import type {
+  AnnotationRegionResult,
   AppActionResult,
   AppRef,
   BrowserActionResult,
@@ -25,19 +26,18 @@ import type {
   TauriActionResult,
   TauriAppRef,
   TauriDriverStatus,
-  AnnotationRegionResult,
   VisualBaselineRef,
   VisualChangeContainmentResult,
   VisualCompareResult,
   VisualHandoff,
   WaitForStableScreenResult,
   WindowActionResult,
-  WindowInfo
+  WindowInfo,
 } from "@agent-desktop-harness/core";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { DesktopMcpToolHandlers } from "./toolHandlers.js";
-import type { SessionManagerLike } from "./toolHandlers.js";
 import { formatErrorMessage, registerDesktopHarnessTools } from "./server.js";
+import type { SessionManagerLike } from "./toolHandlers.js";
+import { DesktopMcpToolHandlers } from "./toolHandlers.js";
 
 test("DesktopMcpToolHandlers redacts secret typeText result details", async () => {
   const manager = new MockSessionManager();
@@ -46,12 +46,12 @@ test("DesktopMcpToolHandlers redacts secret typeText result details", async () =
   const result = (await handlers.typeText({
     sessionId: "session-1",
     text: "secret-value",
-    secret: true
+    secret: true,
   })) as InputActionResult;
 
   assert.deepEqual(result.details, {
     redacted: true,
-    textLength: 12
+    textLength: 12,
   });
 });
 
@@ -65,9 +65,9 @@ test("DesktopMcpToolHandlers redacts secret text from typeText errors", async ()
       await handlers.typeText({
         sessionId: "session-1",
         text: "secret-value",
-        secret: true
+        secret: true,
       }),
-    /backend saw \[redacted\]/
+    /backend saw \[redacted\]/,
   );
 });
 
@@ -78,9 +78,9 @@ test("DesktopMcpToolHandlers validates sessions before launch", async () => {
     async () =>
       await handlers.launchApp({
         sessionId: "missing",
-        command: "xterm"
+        command: "xterm",
       }),
-    /Desktop session not found/
+    /Desktop session not found/,
   );
 });
 
@@ -88,7 +88,7 @@ test("DesktopMcpToolHandlers exposes screenshot annotations and visual handoff",
   const handlers = new DesktopMcpToolHandlers(new MockSessionManager());
 
   const screenshots = (await handlers.listScreenshots({
-    sessionId: "session-1"
+    sessionId: "session-1",
   })) as { screenshots: ScreenshotArtifact[] };
   assert.equal(screenshots.screenshots[0]?.fileName, "0001-demo.png");
 
@@ -100,12 +100,12 @@ test("DesktopMcpToolHandlers exposes screenshot annotations and visual handoff",
     y: 2,
     width: 3,
     height: 4,
-    note: "Button overlaps this text."
+    note: "Button overlaps this text.",
   })) as ScreenshotAnnotation;
   assert.equal(annotation.id, "ann_001");
 
   const handoff = (await handlers.getVisualHandoff({
-    sessionId: "session-1"
+    sessionId: "session-1",
   })) as VisualHandoff;
   assert.match(handoff.text, /Visual Handoff/);
 });
@@ -116,7 +116,7 @@ test("DesktopMcpToolHandlers exposes waitForWindow", async () => {
   const window = (await handlers.waitForWindow({
     sessionId: "session-1",
     titleIncludes: "Test",
-    excludeDevtools: true
+    excludeDevtools: true,
   })) as WindowInfo;
 
   assert.equal(window.id, "0x01");
@@ -127,7 +127,7 @@ test("DesktopMcpToolHandlers exposes browser semantic actions", async () => {
 
   const page = (await handlers.browserOpen({
     sessionId: "session-1",
-    url: "http://127.0.0.1:5179"
+    url: "http://127.0.0.1:5179",
   })) as BrowserPageRef;
   assert.equal(page.pageId, "page-1");
 
@@ -135,7 +135,7 @@ test("DesktopMcpToolHandlers exposes browser semantic actions", async () => {
     sessionId: "session-1",
     placeholder: "Type a message",
     value: "secret-value",
-    secret: true
+    secret: true,
   })) as BrowserActionResult;
   assert.equal(fill.details?.redacted, true);
   assert.equal(JSON.stringify(fill).includes("secret-value"), false);
@@ -143,13 +143,13 @@ test("DesktopMcpToolHandlers exposes browser semantic actions", async () => {
   const click = (await handlers.browserClick({
     sessionId: "session-1",
     role: "button",
-    name: "Save message"
+    name: "Save message",
   })) as BrowserActionResult;
   assert.equal(click.actionType, "browser.click");
 
   const screenshot = (await handlers.browserScreenshot({
     sessionId: "session-1",
-    label: "semantic"
+    label: "semantic",
   })) as ScreenshotResult;
   assert.equal(screenshot.path, "/tmp/browser-screenshot.png");
 });
@@ -160,9 +160,9 @@ test("DesktopMcpToolHandlers validates browser click targets", async () => {
   await assert.rejects(
     async () =>
       await handlers.browserClick({
-        sessionId: "session-1"
+        sessionId: "session-1",
       }),
-    /browser click requires/
+    /browser click requires/,
   );
 });
 
@@ -179,7 +179,7 @@ test("DesktopMcpToolHandlers exposes experimental Tauri fallback guidance", asyn
   const opened = (await handlers.tauriOpen({
     sessionId: "session-1",
     command: "pnpm",
-    args: ["tauri", "dev"]
+    args: ["tauri", "dev"],
   })) as { mode: string; app: TauriAppRef };
   assert.equal(opened.mode, "x11-fallback");
   assert.equal(opened.app.appId, "tauri-app-1");
@@ -187,7 +187,7 @@ test("DesktopMcpToolHandlers exposes experimental Tauri fallback guidance", asyn
   const click = (await handlers.tauriClick({
     sessionId: "session-1",
     role: "button",
-    name: "Save message"
+    name: "Save message",
   })) as { result: TauriActionResult };
   assert.equal(click.result.success, false);
   assert.equal(click.result.mode, "x11-fallback");
@@ -196,14 +196,14 @@ test("DesktopMcpToolHandlers exposes experimental Tauri fallback guidance", asyn
     sessionId: "session-1",
     placeholder: "Type a message",
     value: "secret-value",
-    secret: true
+    secret: true,
   })) as { result: TauriActionResult };
   assert.equal(fill.result.details?.redacted, true);
   assert.equal(JSON.stringify(fill).includes("secret-value"), false);
 
   const screenshot = (await handlers.tauriScreenshot({
     sessionId: "session-1",
-    label: "tauri-fallback"
+    label: "tauri-fallback",
   })) as { screenshot: ScreenshotResult };
   assert.equal(screenshot.screenshot.path, "/tmp/tauri-screenshot.png");
 });
@@ -214,9 +214,9 @@ test("DesktopMcpToolHandlers validates Tauri click targets", async () => {
   await assert.rejects(
     async () =>
       await handlers.tauriClick({
-        sessionId: "session-1"
+        sessionId: "session-1",
       }),
-    /tauri click requires/
+    /tauri click requires/,
   );
 });
 
@@ -233,7 +233,7 @@ test("DesktopMcpToolHandlers exposes experimental Electron semantic actions", as
   const opened = (await handlers.electronOpen({
     sessionId: "session-1",
     command: "electron",
-    args: ["."]
+    args: ["."],
   })) as { mode: string; app: ElectronAppRef };
   assert.equal(opened.mode, "playwright-electron");
   assert.equal(opened.app.appId, "electron-app-1");
@@ -242,7 +242,7 @@ test("DesktopMcpToolHandlers exposes experimental Electron semantic actions", as
     sessionId: "session-1",
     placeholder: "Type a message",
     value: "secret-value",
-    secret: true
+    secret: true,
   })) as { result: ElectronActionResult };
   assert.equal(fill.result.details?.redacted, true);
   assert.equal(JSON.stringify(fill).includes("secret-value"), false);
@@ -250,20 +250,20 @@ test("DesktopMcpToolHandlers exposes experimental Electron semantic actions", as
   const click = (await handlers.electronClick({
     sessionId: "session-1",
     role: "button",
-    name: "Save message"
+    name: "Save message",
   })) as { result: ElectronActionResult };
   assert.equal(click.result.actionType, "electron.click");
 
   const press = (await handlers.electronPress({
     sessionId: "session-1",
     selector: "#message-input",
-    key: "Enter"
+    key: "Enter",
   })) as { result: ElectronActionResult };
   assert.equal(press.result.actionType, "electron.press");
 
   const screenshot = (await handlers.electronScreenshot({
     sessionId: "session-1",
-    label: "electron-semantic"
+    label: "electron-semantic",
   })) as { screenshot: ScreenshotResult };
   assert.equal(screenshot.screenshot.path, "/tmp/electron-screenshot.png");
 });
@@ -274,9 +274,9 @@ test("DesktopMcpToolHandlers validates Electron click targets", async () => {
   await assert.rejects(
     async () =>
       await handlers.electronClick({
-        sessionId: "session-1"
+        sessionId: "session-1",
       }),
-    /electron click requires/
+    /electron click requires/,
   );
 });
 
@@ -289,7 +289,7 @@ test("DesktopMcpToolHandlers exposes high-level driver router actions", async ()
   const decision = (await handlers.driverRoute({
     sessionId: "session-1",
     appKind: "browser",
-    requireSemantic: true
+    requireSemantic: true,
   })) as DriverRouteDecision;
   assert.equal(decision.selectedDriver, "browser-playwright");
 
@@ -297,7 +297,7 @@ test("DesktopMcpToolHandlers exposes high-level driver router actions", async ()
     sessionId: "session-1",
     appKind: "browser",
     url: "http://127.0.0.1:5179",
-    requireSemantic: true
+    requireSemantic: true,
   })) as AppRef;
   assert.equal(app.appId, "app-1");
   assert.equal(app.semantic, true);
@@ -306,7 +306,7 @@ test("DesktopMcpToolHandlers exposes high-level driver router actions", async ()
     sessionId: "session-1",
     placeholder: "Type a message",
     value: "secret-value",
-    secret: true
+    secret: true,
   })) as AppActionResult;
   assert.equal(fill.details?.redacted, true);
   assert.equal(JSON.stringify(fill).includes("secret-value"), false);
@@ -314,13 +314,13 @@ test("DesktopMcpToolHandlers exposes high-level driver router actions", async ()
   const click = (await handlers.appClick({
     sessionId: "session-1",
     role: "button",
-    name: "Save message"
+    name: "Save message",
   })) as AppActionResult;
   assert.equal(click.selectedDriver, "browser-playwright");
 
   const screenshot = (await handlers.appScreenshot({
     sessionId: "session-1",
-    label: "router"
+    label: "router",
   })) as ScreenshotResult;
   assert.equal(screenshot.path, "/tmp/app-screenshot.png");
 });
@@ -340,19 +340,19 @@ test("DesktopMcpToolHandlers exposes optional live observer tools", async () => 
     host: "127.0.0.1",
     vncPort: 5901,
     webPort: 6081,
-    password: "secret-value"
+    password: "secret-value",
   })) as LiveObserverRef;
   assert.equal(observer.observerId, "observer-1");
   assert.equal(JSON.stringify(observer).includes("secret-value"), false);
 
   const listed = (await handlers.observerList({
-    sessionId: "session-1"
+    sessionId: "session-1",
   })) as { observers: LiveObserverRef[] };
   assert.equal(listed.observers.length, 1);
 
   const stopped = (await handlers.observerStop({
     sessionId: "session-1",
-    observerId: "observer-1"
+    observerId: "observer-1",
   })) as { stopped: boolean };
   assert.equal(stopped.stopped, true);
 });
@@ -363,9 +363,9 @@ test("DesktopMcpToolHandlers validates high-level app click targets", async () =
   await assert.rejects(
     async () =>
       await handlers.appClick({
-        sessionId: "session-1"
+        sessionId: "session-1",
       }),
-    /app click requires/
+    /app click requires/,
   );
 });
 
@@ -377,7 +377,7 @@ test("DesktopMcpToolHandlers exposes visual QA comparisons and assertions", asyn
     beforePath: "screenshots/0001-before.png",
     afterPath: "screenshots/0002-after.png",
     label: "router",
-    createDiffImage: true
+    createDiffImage: true,
   })) as VisualCompareResult;
   assert.equal(compare.kind, "compare");
   assert.match(compare.diffPath ?? "", /visual-diffs/);
@@ -386,7 +386,7 @@ test("DesktopMcpToolHandlers exposes visual QA comparisons and assertions", asyn
     sessionId: "session-1",
     beforePath: "screenshots/0001-before.png",
     afterPath: "screenshots/0002-after.png",
-    minDiffPixelRatio: 0.01
+    minDiffPixelRatio: 0.01,
   })) as VisualCompareResult;
   assert.equal(changed.passed, true);
 
@@ -394,7 +394,7 @@ test("DesktopMcpToolHandlers exposes visual QA comparisons and assertions", asyn
     sessionId: "session-1",
     beforePath: "screenshots/0001-before.png",
     afterPath: "screenshots/0002-after.png",
-    maxDiffPixelRatio: 0.1
+    maxDiffPixelRatio: 0.1,
   })) as VisualCompareResult;
   assert.equal(similar.passed, true);
 
@@ -403,13 +403,13 @@ test("DesktopMcpToolHandlers exposes visual QA comparisons and assertions", asyn
     screenshotPath: "screenshots/0001-before.png",
     name: "sample-vite-clean",
     suite: "smoke",
-    overwrite: true
+    overwrite: true,
   })) as VisualBaselineRef;
   assert.equal(baseline.name, "sample-vite-clean");
 
   const baselines = (await handlers.visualListBaselines({
     sessionId: "session-1",
-    suite: "smoke"
+    suite: "smoke",
   })) as { baselines: VisualBaselineRef[] };
   assert.equal(baselines.baselines[0]?.suite, "smoke");
 
@@ -418,7 +418,7 @@ test("DesktopMcpToolHandlers exposes visual QA comparisons and assertions", asyn
     screenshotPath: "screenshots/0002-after.png",
     baselineName: "sample-vite-clean",
     suite: "smoke",
-    createDiffImage: true
+    createDiffImage: true,
   })) as VisualCompareResult;
   assert.equal(baselineCompare.kind, "compare-baseline");
   assert.equal(baselineCompare.baselineName, "sample-vite-clean");
@@ -427,7 +427,7 @@ test("DesktopMcpToolHandlers exposes visual QA comparisons and assertions", asyn
     sessionId: "session-1",
     annotationId: "ann_001",
     afterPath: "screenshots/0002-after.png",
-    minDiffPixelRatio: 0.01
+    minDiffPixelRatio: 0.01,
   })) as VisualCompareResult;
   assert.equal(annotationChanged.kind, "assert-annotation-changed");
   assert.equal(annotationChanged.annotationId, "ann_001");
@@ -436,7 +436,7 @@ test("DesktopMcpToolHandlers exposes visual QA comparisons and assertions", asyn
     sessionId: "session-1",
     annotationId: "ann_001",
     afterPath: "screenshots/0002-after.png",
-    maxDiffPixelRatio: 0.1
+    maxDiffPixelRatio: 0.1,
   })) as VisualCompareResult;
   assert.equal(annotationSimilar.kind, "assert-annotation-similar");
 
@@ -449,17 +449,17 @@ test("DesktopMcpToolHandlers exposes visual QA comparisons and assertions", asyn
         x: 1,
         y: 2,
         width: 3,
-        height: 4
-      }
+        height: 4,
+      },
     ],
-    maxOutsideDiffPixelRatio: 0.01
+    maxOutsideDiffPixelRatio: 0.01,
   })) as VisualChangeContainmentResult;
   assert.equal(contained.kind, "assert-change-contained");
   assert.equal(contained.containmentPassed, true);
   assert.equal(contained.outsideDiffPixelRatio, 0);
 
   const assertions = (await handlers.visualListAssertions({
-    sessionId: "session-1"
+    sessionId: "session-1",
   })) as { assertions: VisualCompareResult[] };
   assert.equal(assertions.assertions[0]?.kind, "assert-changed");
 });
@@ -477,22 +477,24 @@ test("DesktopMcpToolHandlers rejects invalid annotation screenshot paths", async
         y: 2,
         width: 3,
         height: 4,
-        note: "bad path"
+        note: "bad path",
       }),
-    /file name/
+    /file name/,
   );
 });
 
 test("registerDesktopHarnessTools registers all expected tool names", () => {
   const server = new McpServer({
     name: "test",
-    version: "0.0.0"
+    version: "0.0.0",
   });
   registerDesktopHarnessTools(server, new DesktopMcpToolHandlers(new MockSessionManager()));
 
-  const registeredTools = (server as unknown as {
-    _registeredTools: Record<string, unknown>;
-  })._registeredTools;
+  const registeredTools = (
+    server as unknown as {
+      _registeredTools: Record<string, unknown>;
+    }
+  )._registeredTools;
 
   assert.deepEqual(Object.keys(registeredTools).sort(), [
     "app_assert_text",
@@ -559,7 +561,7 @@ test("registerDesktopHarnessTools registers all expected tool names", () => {
     "visual_compare_baseline",
     "visual_list_assertions",
     "visual_list_baselines",
-    "visual_save_baseline"
+    "visual_save_baseline",
   ]);
 });
 
@@ -575,7 +577,7 @@ class MockSessionManager implements SessionManagerLike {
     return {
       ...this.session,
       config,
-      workspacePath: config.workspacePath
+      workspacePath: config.workspacePath,
     };
   }
 
@@ -595,7 +597,7 @@ class MockSessionManager implements SessionManagerLike {
       args: [],
       cwd: this.session.workspacePath,
       display: this.session.display,
-      startedAt: new Date("2026-01-01T00:00:00.000Z")
+      startedAt: new Date("2026-01-01T00:00:00.000Z"),
     };
   }
 
@@ -609,7 +611,7 @@ class MockSessionManager implements SessionManagerLike {
       capturedAt: new Date("2026-01-01T00:00:00.000Z"),
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
       display: this.session.display,
-      sequence: 1
+      sequence: 1,
     };
   }
 
@@ -626,7 +628,7 @@ class MockSessionManager implements SessionManagerLike {
       throw this.typeTextError;
     }
     return this.inputResult("input.type_text", {
-      text: "secret-value"
+      text: "secret-value",
     });
   }
 
@@ -643,8 +645,8 @@ class MockSessionManager implements SessionManagerLike {
       {
         id: "0x01",
         title: "Test Window",
-        pid: 123
-      }
+        pid: 123,
+      },
     ];
   }
 
@@ -654,9 +656,9 @@ class MockSessionManager implements SessionManagerLike {
       success: true,
       window: {
         id: "0x01",
-        title: "Test Window"
+        title: "Test Window",
       },
-      createdAt: "2026-01-01T00:00:00.000Z"
+      createdAt: "2026-01-01T00:00:00.000Z",
     };
   }
 
@@ -667,7 +669,7 @@ class MockSessionManager implements SessionManagerLike {
       checks: 2,
       elapsedMs: 1000,
       mode: "hash",
-      discardedScreenshotCount: 0
+      discardedScreenshotCount: 0,
     };
   }
 
@@ -675,7 +677,7 @@ class MockSessionManager implements SessionManagerLike {
     return {
       id: "0x01",
       title: "Test Window",
-      pid: 123
+      pid: 123,
     };
   }
 
@@ -685,7 +687,7 @@ class MockSessionManager implements SessionManagerLike {
       pageId: "page-1",
       url: "http://127.0.0.1:5179",
       title: "Agent Desktop Harness Demo",
-      createdAt: "2026-01-01T00:00:00.000Z"
+      createdAt: "2026-01-01T00:00:00.000Z",
     };
   }
 
@@ -696,7 +698,7 @@ class MockSessionManager implements SessionManagerLike {
   async browserFill(): Promise<BrowserActionResult> {
     return this.browserResult("browser.fill", {
       redacted: true,
-      valueLength: 12
+      valueLength: 12,
     });
   }
 
@@ -719,7 +721,7 @@ class MockSessionManager implements SessionManagerLike {
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
       display: this.session.display,
       sequence: 2,
-      label: "semantic"
+      label: "semantic",
     };
   }
 
@@ -731,7 +733,7 @@ class MockSessionManager implements SessionManagerLike {
     return {
       available: false,
       warnings: [],
-      errors: ["tauri-driver is missing."]
+      errors: ["tauri-driver is missing."],
     };
   }
 
@@ -742,7 +744,7 @@ class MockSessionManager implements SessionManagerLike {
       processId: 456,
       createdAt: "2026-01-01T00:00:00.000Z",
       mode: "x11-fallback",
-      warnings: ["Tauri WebDriver semantic mode is unavailable; use desktop_* X11 fallback tools."]
+      warnings: ["Tauri WebDriver semantic mode is unavailable; use desktop_* X11 fallback tools."],
     };
   }
 
@@ -753,7 +755,7 @@ class MockSessionManager implements SessionManagerLike {
   async tauriFill(): Promise<TauriActionResult> {
     return this.tauriResult("tauri.fill", {
       redacted: true,
-      valueLength: 12
+      valueLength: 12,
     });
   }
 
@@ -772,7 +774,7 @@ class MockSessionManager implements SessionManagerLike {
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
       display: this.session.display,
       sequence: 3,
-      label: "tauri-fallback"
+      label: "tauri-fallback",
     };
   }
 
@@ -786,7 +788,7 @@ class MockSessionManager implements SessionManagerLike {
       playwrightAvailable: true,
       electronBinaryPath: "/tmp/electron",
       warnings: [],
-      errors: []
+      errors: [],
     };
   }
 
@@ -798,7 +800,7 @@ class MockSessionManager implements SessionManagerLike {
       createdAt: "2026-01-01T00:00:00.000Z",
       mode: "playwright-electron",
       windowTitle: "Agent Desktop Harness Electron Demo",
-      warnings: []
+      warnings: [],
     };
   }
 
@@ -809,7 +811,7 @@ class MockSessionManager implements SessionManagerLike {
   async electronFill(): Promise<ElectronActionResult> {
     return this.electronResult("electron.fill", {
       redacted: true,
-      valueLength: 12
+      valueLength: 12,
     });
   }
 
@@ -832,7 +834,7 @@ class MockSessionManager implements SessionManagerLike {
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
       display: this.session.display,
       sequence: 4,
-      label: "electron-semantic"
+      label: "electron-semantic",
     };
   }
 
@@ -850,7 +852,7 @@ class MockSessionManager implements SessionManagerLike {
       noVncWebRootPath: "/usr/share/novnc",
       warnings: [],
       errors: [],
-      installHints: ["sudo apt install -y x11vnc novnc websockify"]
+      installHints: ["sudo apt install -y x11vnc novnc websockify"],
     };
   }
 
@@ -866,7 +868,7 @@ class MockSessionManager implements SessionManagerLike {
     return {
       sessionId: this.session.id,
       observerId: "observer-1",
-      stopped: true
+      stopped: true,
     };
   }
 
@@ -880,34 +882,34 @@ class MockSessionManager implements SessionManagerLike {
         available: true,
         driver: "browser-playwright",
         warnings: [],
-        errors: []
+        errors: [],
       },
       tauri: {
         available: false,
         driver: "tauri-webdriver",
         experimental: true,
         warnings: [],
-        errors: ["tauri-driver is missing."]
+        errors: ["tauri-driver is missing."],
       },
       electron: {
         available: true,
         driver: "electron-playwright",
         experimental: true,
         warnings: [],
-        errors: []
+        errors: [],
       },
       x11Fallback: {
         available: true,
         driver: "x11-fallback",
         warnings: [],
-        errors: []
-      }
+        errors: [],
+      },
     };
   }
 
   async routeDriver(
     _sessionId: SessionId,
-    request: DriverRouteRequest
+    request: DriverRouteRequest,
   ): Promise<DriverRouteDecision> {
     return {
       appKind: request.appKind,
@@ -917,7 +919,7 @@ class MockSessionManager implements SessionManagerLike {
       fallbackUsed: request.appKind !== "browser",
       fallbackReason: request.appKind === "browser" ? undefined : "semantic driver unavailable",
       warnings: [],
-      errors: []
+      errors: [],
     };
   }
 
@@ -930,7 +932,7 @@ class MockSessionManager implements SessionManagerLike {
       semantic: true,
       fallbackUsed: false,
       createdAt: "2026-01-01T00:00:00.000Z",
-      warnings: []
+      warnings: [],
     };
   }
 
@@ -941,7 +943,7 @@ class MockSessionManager implements SessionManagerLike {
   async appFill(): Promise<AppActionResult> {
     return this.appResult("app.fill", {
       redacted: true,
-      valueLength: 12
+      valueLength: 12,
     });
   }
 
@@ -964,7 +966,7 @@ class MockSessionManager implements SessionManagerLike {
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
       display: this.session.display,
       sequence: 5,
-      label: "router"
+      label: "router",
     };
   }
 
@@ -996,7 +998,7 @@ class MockSessionManager implements SessionManagerLike {
     return {
       ...this.visualResult("compare-baseline", true),
       baselineName: "sample-vite-clean",
-      baselineSuite: "smoke"
+      baselineSuite: "smoke",
     };
   }
 
@@ -1007,10 +1009,10 @@ class MockSessionManager implements SessionManagerLike {
         x: 1,
         y: 2,
         width: 3,
-        height: 4
+        height: 4,
       },
       screenshotPath: `${this.session.evidencePath}/screenshots/0001-demo.png`,
-      note: "Button overlaps this text."
+      note: "Button overlaps this text.",
     };
   }
 
@@ -1018,7 +1020,7 @@ class MockSessionManager implements SessionManagerLike {
     return {
       ...this.visualResult("assert-annotation-changed", true),
       annotationId: "ann_001",
-      annotationNote: "Button overlaps this text."
+      annotationNote: "Button overlaps this text.",
     };
   }
 
@@ -1026,7 +1028,7 @@ class MockSessionManager implements SessionManagerLike {
     return {
       ...this.visualResult("assert-annotation-similar", true),
       annotationId: "ann_001",
-      annotationNote: "Button overlaps this text."
+      annotationNote: "Button overlaps this text.",
     };
   }
 
@@ -1038,8 +1040,8 @@ class MockSessionManager implements SessionManagerLike {
           x: 1,
           y: 2,
           width: 3,
-          height: 4
-        }
+          height: 4,
+        },
       ],
       insideComparedPixels: 12,
       insideDiffPixels: 4,
@@ -1047,7 +1049,7 @@ class MockSessionManager implements SessionManagerLike {
       outsideComparedPixels: 88,
       outsideDiffPixels: 0,
       outsideDiffPixelRatio: 0,
-      containmentPassed: true
+      containmentPassed: true,
     };
   }
 
@@ -1063,14 +1065,14 @@ class MockSessionManager implements SessionManagerLike {
         path: `${this.session.evidencePath}/screenshots/0001-demo.png`,
         sequence: 1,
         label: "demo",
-        createdAt: "2026-01-01T00:00:00.000Z"
-      }
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
     ];
   }
 
   async createAnnotation(
     sessionId: SessionId,
-    input: CreateAnnotationInput
+    input: CreateAnnotationInput,
   ): Promise<ScreenshotAnnotation> {
     return {
       id: "ann_001",
@@ -1087,7 +1089,7 @@ class MockSessionManager implements SessionManagerLike {
       note: input.note,
       color: input.color,
       cropPath: `${this.session.evidencePath}/annotations/ann_001-crop.png`,
-      createdAt: "2026-01-01T00:00:00.000Z"
+      createdAt: "2026-01-01T00:00:00.000Z",
     };
   }
 
@@ -1104,8 +1106,8 @@ class MockSessionManager implements SessionManagerLike {
         width: 3,
         height: 4,
         note: "Button overlaps this text.",
-        createdAt: "2026-01-01T00:00:00.000Z"
-      }
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
     ];
   }
 
@@ -1114,7 +1116,7 @@ class MockSessionManager implements SessionManagerLike {
       sessionId: this.session.id,
       path: `${this.session.evidencePath}/visual-handoff.md`,
       text: "# Visual Handoff\n\nButton overlaps this text.\n",
-      annotations: await this.listAnnotations()
+      annotations: await this.listAnnotations(),
     };
   }
 
@@ -1124,20 +1126,20 @@ class MockSessionManager implements SessionManagerLike {
 
   private inputResult(
     actionType: string,
-    details: Readonly<Record<string, unknown>> = {}
+    details: Readonly<Record<string, unknown>> = {},
   ): InputActionResult {
     return {
       sessionId: this.session.id,
       actionType,
       createdAt: "2026-01-01T00:00:00.000Z",
       success: true,
-      details
+      details,
     };
   }
 
   private browserResult(
     actionType: string,
-    details: Readonly<Record<string, unknown>> = {}
+    details: Readonly<Record<string, unknown>> = {},
   ): BrowserActionResult {
     return {
       sessionId: this.session.id,
@@ -1145,13 +1147,13 @@ class MockSessionManager implements SessionManagerLike {
       actionType,
       createdAt: "2026-01-01T00:00:00.000Z",
       success: true,
-      details
+      details,
     };
   }
 
   private tauriResult(
     actionType: string,
-    details: Readonly<Record<string, unknown>> = {}
+    details: Readonly<Record<string, unknown>> = {},
   ): TauriActionResult {
     return {
       sessionId: this.session.id,
@@ -1162,15 +1164,15 @@ class MockSessionManager implements SessionManagerLike {
       mode: "x11-fallback",
       details: {
         unavailable: true,
-        ...details
+        ...details,
       },
-      warnings: ["Tauri WebDriver semantic mode is unavailable; use desktop_* X11 fallback tools."]
+      warnings: ["Tauri WebDriver semantic mode is unavailable; use desktop_* X11 fallback tools."],
     };
   }
 
   private electronResult(
     actionType: string,
-    details: Readonly<Record<string, unknown>> = {}
+    details: Readonly<Record<string, unknown>> = {},
   ): ElectronActionResult {
     return {
       sessionId: this.session.id,
@@ -1179,13 +1181,13 @@ class MockSessionManager implements SessionManagerLike {
       createdAt: "2026-01-01T00:00:00.000Z",
       success: true,
       mode: "playwright-electron",
-      details
+      details,
     };
   }
 
   private appResult(
     actionType: string,
-    details: Readonly<Record<string, unknown>> = {}
+    details: Readonly<Record<string, unknown>> = {},
   ): AppActionResult {
     return {
       sessionId: this.session.id,
@@ -1198,7 +1200,7 @@ class MockSessionManager implements SessionManagerLike {
       createdAt: "2026-01-01T00:00:00.000Z",
       success: true,
       warnings: [],
-      details
+      details,
     };
   }
 
@@ -1211,7 +1213,7 @@ class MockSessionManager implements SessionManagerLike {
       | "assert-annotation-changed"
       | "assert-annotation-similar"
       | "assert-change-contained",
-    passed: boolean | undefined
+    passed: boolean | undefined,
   ): VisualCompareResult {
     return {
       sessionId: this.session.id,
@@ -1230,7 +1232,7 @@ class MockSessionManager implements SessionManagerLike {
       maxDiffPixelRatio: kind === "assert-similar" ? 0.1 : undefined,
       passed,
       createdAt: "2026-01-01T00:00:00.000Z",
-      warnings: []
+      warnings: [],
     };
   }
 
@@ -1242,7 +1244,7 @@ class MockSessionManager implements SessionManagerLike {
       sourceScreenshotPath: `${this.session.evidencePath}/screenshots/0001-before.png`,
       width: 10,
       height: 10,
-      createdAt: "2026-01-01T00:00:00.000Z"
+      createdAt: "2026-01-01T00:00:00.000Z",
     };
   }
 
@@ -1256,7 +1258,7 @@ class MockSessionManager implements SessionManagerLike {
       viewOnly: true,
       url: "http://127.0.0.1:6081/vnc.html?autoconnect=1&resize=scale&view_only=1",
       createdAt: "2026-01-01T00:00:00.000Z",
-      warnings: []
+      warnings: [],
     };
   }
 }
@@ -1265,7 +1267,7 @@ function makeSession(): DesktopSession {
   return {
     id: "session-1",
     config: {
-      workspacePath: "/tmp/agent-desktop-harness-test"
+      workspacePath: "/tmp/agent-desktop-harness-test",
     },
     driverKind: "unknown",
     status: "running",
@@ -1278,8 +1280,8 @@ function makeSession(): DesktopSession {
     height: 900,
     depth: 24,
     processIds: {
-      apps: []
+      apps: [],
     },
-    warnings: []
+    warnings: [],
   };
 }

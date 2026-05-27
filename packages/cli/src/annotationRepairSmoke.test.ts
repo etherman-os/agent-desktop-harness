@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  REPAIR_DEMO_ANNOTATION_RECT,
   createRepairDemoAnnotationPayload,
   ensureAnnotationRepairSmokeReady,
-  parseSmokeAnnotationRepairArgs
+  parseSmokeAnnotationRepairArgs,
+  REPAIR_DEMO_ANNOTATION_RECT,
 } from "./annotationRepairSmoke.js";
 import type { DoctorReport } from "./doctor.js";
 
@@ -17,14 +17,8 @@ test("parseSmokeAnnotationRepairArgs uses stable local defaults", () => {
 });
 
 test("parseSmokeAnnotationRepairArgs validates ports", () => {
-  assert.throws(
-    () => parseSmokeAnnotationRepairArgs(["--vite-port", "0"]),
-    /Invalid port/
-  );
-  assert.throws(
-    () => parseSmokeAnnotationRepairArgs(["--http-port", "70000"]),
-    /Invalid port/
-  );
+  assert.throws(() => parseSmokeAnnotationRepairArgs(["--vite-port", "0"]), /Invalid port/);
+  assert.throws(() => parseSmokeAnnotationRepairArgs(["--http-port", "70000"]), /Invalid port/);
 });
 
 test("repair demo annotation rectangle is configured for a visible area", () => {
@@ -52,13 +46,13 @@ test("ensureAnnotationRepairSmokeReady fails when required dependencies are miss
         name: "Xvfb",
         level: "required",
         installHint: "sudo apt install -y xvfb",
-        found: false
-      }
-    ]
+        found: false,
+      },
+    ],
   };
 
   assert.throws(
     () => ensureAnnotationRepairSmokeReady(report),
-    /Missing required dependencies: Xvfb/
+    /Missing required dependencies: Xvfb/,
   );
 });

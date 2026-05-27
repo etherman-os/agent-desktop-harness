@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   DOCTOR_DEPENDENCIES,
+  type DoctorReport,
   formatDoctorText,
   formatMissingRequiredMessage,
   getTauriDriverDependencyStatuses,
   runDoctor,
-  type DoctorReport
 } from "./doctor.js";
 
 test("runDoctor returns machine-readable dependency statuses", async () => {
@@ -15,10 +15,10 @@ test("runDoctor returns machine-readable dependency statuses", async () => {
       {
         name: "definitely-not-agent-desktop-harness-binary",
         level: "required",
-        installHint: "sudo apt install -y missing"
-      }
+        installHint: "sudo apt install -y missing",
+      },
     ],
-    { PATH: "" }
+    { PATH: "" },
   );
 
   assert.equal(report.ready, false);
@@ -29,8 +29,8 @@ test("runDoctor returns machine-readable dependency statuses", async () => {
       level: "required",
       installHint: "sudo apt install -y missing",
       found: false,
-      path: undefined
-    }
+      path: undefined,
+    },
   ]);
   assert.equal(report.experimental?.tauriDriver.available, false);
 });
@@ -45,87 +45,88 @@ test("formatDoctorText includes human-readable sections and status", () => {
         level: "required",
         installHint: "sudo apt install -y xvfb",
         found: true,
-        path: "/usr/bin/Xvfb"
+        path: "/usr/bin/Xvfb",
       },
       {
         name: "scrot",
         level: "required",
         installHint: "sudo apt install -y scrot",
-        found: false
+        found: false,
       },
       {
         name: "openbox",
         level: "recommended",
         installHint: "sudo apt install -y openbox",
-        found: false
+        found: false,
       },
       {
         name: "xterm",
         level: "optional",
         installHint: "sudo apt install -y xterm",
-        found: false
+        found: false,
       },
       {
         name: "tauri-driver",
         level: "experimental",
         installHint: "cargo install tauri-driver --locked",
-        found: false
+        found: false,
       },
       {
         name: "WebKitWebDriver",
         level: "experimental",
-        installHint: "Install the WebKit WebDriver package for your distribution; package names vary.",
-        found: false
+        installHint:
+          "Install the WebKit WebDriver package for your distribution; package names vary.",
+        found: false,
       },
       {
         name: "cargo",
         level: "experimental",
         installHint: "Install Rust and Cargo from your distribution packages or rustup.",
         found: true,
-        path: "/usr/bin/cargo"
+        path: "/usr/bin/cargo",
       },
       {
         name: "x11vnc",
         level: "observer",
         installHint: "sudo apt install -y x11vnc",
-        found: false
+        found: false,
       },
       {
         name: "websockify",
         level: "observer",
         installHint: "sudo apt install -y websockify",
-        found: false
+        found: false,
       },
       {
         name: "novnc_proxy",
         level: "observer",
         installHint: "sudo apt install -y novnc",
-        found: false
-      }
+        found: false,
+      },
     ],
     experimental: {
       tauriDriver: {
         available: false,
         dependencies: [],
         warnings: [],
-        errors: ["tauri-driver is missing."]
+        errors: ["tauri-driver is missing."],
       },
       electronDriver: {
         available: true,
         playwrightAvailable: true,
         electronBinaryPath: "/tmp/node_modules/.bin/electron",
         warnings: [],
-        errors: []
-      }
+        errors: [],
+      },
     },
     optional: {
       liveObserver: {
         available: false,
         warnings: [],
         errors: ["x11vnc is missing."],
-        installHints: ["sudo apt install -y x11vnc novnc websockify"]
-      }
-    }
+        installHints: ["sudo apt install -y x11vnc novnc websockify"],
+      },
+    },
   };
 
   const text = formatDoctorText(report);
@@ -151,10 +152,7 @@ test("formatDoctorText includes human-readable sections and status", () => {
 
 test("dependency install hints map to the expected Ubuntu packages", () => {
   const hints = new Map(
-    DOCTOR_DEPENDENCIES.map((dependency) => [
-      dependency.name,
-      dependency.installHint
-    ])
+    DOCTOR_DEPENDENCIES.map((dependency) => [dependency.name, dependency.installHint]),
   );
 
   assert.equal(hints.get("Xvfb"), "sudo apt install -y xvfb");
@@ -176,10 +174,10 @@ test("Tauri driver dependencies are experimental and do not block readiness", as
       {
         name: "tauri-driver",
         level: "experimental",
-        installHint: "cargo install tauri-driver --locked"
-      }
+        installHint: "cargo install tauri-driver --locked",
+      },
     ],
-    { PATH: "" }
+    { PATH: "" },
   );
 
   assert.equal(report.ready, true);
@@ -198,9 +196,9 @@ test("missing required message lists missing dependencies and hints", () => {
         name: "Xvfb",
         level: "required",
         installHint: "sudo apt install -y xvfb",
-        found: false
-      }
-    ]
+        found: false,
+      },
+    ],
   };
 
   const message = formatMissingRequiredMessage(report);

@@ -9,7 +9,13 @@
     "url": "git+https://github.com/etherman-os/agent-desktop-harness.git",
     "directory": "packages/mcp-server"
   },
-  "keywords": ["agent", "gui", "qa", "xvfb", "mcp"],
+  "keywords": [
+    "agent",
+    "gui",
+    "qa",
+    "xvfb",
+    "mcp"
+  ],
   "engines": {
     "node": ">=22"
   },
@@ -26,7 +32,7 @@
     "start": "node dist/index.js",
     "build": "pnpm --filter @agent-desktop-harness/core build && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "echo \"No lint configured yet for @agent-desktop-harness/mcp-server\"",
+    "lint": "biome check . --max-diagnostics=100",
     "test": "pnpm build && node --test dist/schemas.test.js dist/toolHandlers.test.js"
   },
   "dependencies": {

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { DoctorReport } from "./doctor.js";
 import {
   ensureTauriDriverSmokeReady,
   parseCommandLine,
-  parseSmokeTauriDriverArgs
+  parseSmokeTauriDriverArgs,
 } from "./tauriDriverSmoke.js";
-import type { DoctorReport } from "./doctor.js";
 
 test("parseSmokeTauriDriverArgs uses environment-driven Tauri app config", () => {
   const parsed = parseSmokeTauriDriverArgs([], {
@@ -19,7 +19,7 @@ test("parseSmokeTauriDriverArgs uses environment-driven Tauri app config", () =>
     AGENT_DESKTOP_HARNESS_TAURI_WINDOW_TITLE: "Demo",
     AGENT_DESKTOP_HARNESS_TAURI_WEBDRIVER_PORT: "4445",
     AGENT_DESKTOP_HARNESS_TAURI_ASSERT_TEXT: "Ready",
-    AGENT_DESKTOP_HARNESS_TAURI_TIMEOUT_MS: "12000"
+    AGENT_DESKTOP_HARNESS_TAURI_TIMEOUT_MS: "12000",
   });
 
   assert.deepEqual(parsed.command, ["pnpm", "--filter", "@app", "tauri", "dev"]);
@@ -60,11 +60,11 @@ test("parseSmokeTauriDriverArgs lets CLI options override env", () => {
       "--assert-text",
       "Loaded",
       "--timeout-ms",
-      "10000"
+      "10000",
     ],
     {
-      AGENT_DESKTOP_HARNESS_TAURI_COMMAND: "pnpm tauri dev"
-    }
+      AGENT_DESKTOP_HARNESS_TAURI_COMMAND: "pnpm tauri dev",
+    },
   );
 
   assert.deepEqual(parsed.command, ["cargo", "tauri", "dev"]);
@@ -87,7 +87,7 @@ test("parseCommandLine handles quotes and rejects malformed input", () => {
     "--filter",
     "@scope/app",
     "tauri",
-    "dev"
+    "dev",
   ]);
 
   assert.throws(() => parseCommandLine("pnpm 'tauri dev"), /unterminated/);
@@ -103,13 +103,10 @@ test("ensureTauriDriverSmokeReady fails when required desktop dependencies are m
         name: "Xvfb",
         level: "required",
         installHint: "sudo apt install -y xvfb",
-        found: false
-      }
-    ]
+        found: false,
+      },
+    ],
   };
 
-  assert.throws(
-    () => ensureTauriDriverSmokeReady(report),
-    /Missing required dependencies: Xvfb/
-  );
+  assert.throws(() => ensureTauriDriverSmokeReady(report), /Missing required dependencies: Xvfb/);
 });

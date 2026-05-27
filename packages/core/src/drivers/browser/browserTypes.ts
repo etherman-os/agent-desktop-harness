@@ -1,8 +1,4 @@
-import type {
-  DesktopSession,
-  ScreenshotResult,
-  SessionId
-} from "../../types.js";
+import type { DesktopSession, ScreenshotResult, SessionId } from "../../types.js";
 
 export type BrowserName = "chromium" | "chrome" | "firefox";
 
@@ -87,13 +83,13 @@ export interface BrowserDriver {
   press(session: DesktopSession, options: BrowserPressOptions): Promise<BrowserActionResult>;
   assertText(
     session: DesktopSession,
-    options: BrowserAssertTextOptions
+    options: BrowserAssertTextOptions,
   ): Promise<BrowserActionResult>;
   screenshot(
     session: DesktopSession,
     filePath: string,
     sequence: number,
-    options: BrowserScreenshotOptions
+    options: BrowserScreenshotOptions,
   ): Promise<ScreenshotResult>;
   close(session: DesktopSession, pageId?: string): Promise<void>;
   closeAll(sessionId: SessionId): Promise<void>;

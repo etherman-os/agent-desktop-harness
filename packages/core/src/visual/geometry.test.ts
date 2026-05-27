@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { checkRegionOverlaps } from "./geometry.js";
 
 test("checkRegionOverlaps reports overlap metrics for known rectangles", () => {
@@ -10,21 +10,21 @@ test("checkRegionOverlaps reports overlap metrics for known rectangles", () => {
         x: 0,
         y: 0,
         width: 10,
-        height: 10
+        height: 10,
       },
       {
         x: 5,
         y: 5,
         width: 10,
-        height: 10
+        height: 10,
       },
       {
         x: 30,
         y: 30,
         width: 5,
-        height: 5
-      }
-    ]
+        height: 5,
+      },
+    ],
   });
 
   assert.equal(overlap?.overlaps, true);
@@ -32,7 +32,7 @@ test("checkRegionOverlaps reports overlap metrics for known rectangles", () => {
     x: 5,
     y: 5,
     width: 5,
-    height: 5
+    height: 5,
   });
   assert.equal(overlap?.overlapArea, 25);
   assert.equal(overlap?.overlapRatioA, 0.25);
@@ -48,15 +48,15 @@ test("checkRegionOverlaps validates labels and rectangle geometry", () => {
           x: 0,
           y: 0,
           width: 1,
-          height: 1
+          height: 1,
         },
         {
           x: 2,
           y: 2,
           width: 1,
-          height: 1
-        }
-      ]
+          height: 1,
+        },
+      ],
     });
   }, /labels/);
 
@@ -67,9 +67,9 @@ test("checkRegionOverlaps validates labels and rectangle geometry", () => {
           x: 0,
           y: 0,
           width: 0,
-          height: 1
-        }
-      ]
+          height: 1,
+        },
+      ],
     });
   }, /positive finite/);
 });

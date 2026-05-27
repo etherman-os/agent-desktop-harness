@@ -1,33 +1,33 @@
 import type { SpawnOptionsWithoutStdio } from "node:child_process";
+import { ProcessError } from "../errors.js";
 import type {
   ClickAction,
   DesktopSession,
   HotkeyAction,
   InputActionResult,
   ScrollAction,
-  TypeTextAction
+  TypeTextAction,
 } from "../types.js";
-import { ProcessError } from "../errors.js";
+import type { CommandRunner, DependencyChecker } from "../utils/command.js";
 import {
   assertExecutableOnPath,
   createSanitizedEnvironment,
-  runCommand
+  runCommand,
 } from "../utils/command.js";
-import type { CommandRunner, DependencyChecker } from "../utils/command.js";
 import { isoNow } from "../utils/time.js";
 import type { InputBackend } from "./types.js";
 
 const BUTTON_BY_NAME: Record<NonNullable<ClickAction["button"]>, string> = {
   left: "1",
   middle: "2",
-  right: "3"
+  right: "3",
 };
 
 const SCROLL_BUTTON_BY_DIRECTION: Record<ScrollAction["direction"], string> = {
   up: "4",
   down: "5",
   left: "6",
-  right: "7"
+  right: "7",
 };
 
 const KEY_ALIASES = new Map<string, string>([
@@ -45,7 +45,7 @@ const KEY_ALIASES = new Map<string, string>([
   ["return", "Return"],
   ["space", "space"],
   ["backspace", "BackSpace"],
-  ["delete", "Delete"]
+  ["delete", "Delete"],
 ]);
 
 export interface XdotoolInputBackendOptions {
@@ -69,14 +69,14 @@ export class XdotoolInputBackend implements InputBackend {
       String(action.x),
       String(action.y),
       "click",
-      button
+      button,
     ]);
 
     return makeInputResult(session, "input.click", {
       x: action.x,
       y: action.y,
       button: action.button ?? "left",
-      label: action.label
+      label: action.label,
     });
   }
 
@@ -89,14 +89,14 @@ export class XdotoolInputBackend implements InputBackend {
       "click",
       "--repeat",
       "2",
-      button
+      button,
     ]);
 
     return makeInputResult(session, "input.double_click", {
       x: action.x,
       y: action.y,
       button: action.button ?? "left",
-      label: action.label
+      label: action.label,
     });
   }
 
@@ -112,7 +112,7 @@ export class XdotoolInputBackend implements InputBackend {
 
     return makeInputResult(session, "input.hotkey", {
       keys: normalizeHotkeyKeys(action.keys),
-      label: action.label
+      label: action.label,
     });
   }
 
@@ -133,25 +133,22 @@ export class XdotoolInputBackend implements InputBackend {
       amount,
       x: action.x,
       y: action.y,
-      label: action.label
+      label: action.label,
     });
   }
 
   private async runXdotool(
     session: DesktopSession,
     args: readonly string[],
-    options: SpawnOptionsWithoutStdio = {}
+    options: SpawnOptionsWithoutStdio = {},
   ): Promise<void> {
-    await this.dependencyChecker(
-      "xdotool",
-      "Install it with: sudo apt install -y xdotool"
-    );
+    await this.dependencyChecker("xdotool", "Install it with: sudo apt install -y xdotool");
     await this.commandRunner("xdotool", args, {
       ...options,
       env: createSanitizedEnvironment({
         ...options.env,
-        DISPLAY: session.display
-      })
+        DISPLAY: session.display,
+      }),
     });
   }
 }
@@ -193,7 +190,7 @@ export function makeTypeTextDetails(action: TypeTextAction): Readonly<Record<str
     return {
       redacted: true,
       textLength: action.text.length,
-      label: action.label
+      label: action.label,
     };
   }
 
@@ -201,29 +198,27 @@ export function makeTypeTextDetails(action: TypeTextAction): Readonly<Record<str
     text: truncateForLog(action.text),
     textLength: action.text.length,
     truncated: action.text.length > 256,
-    label: action.label
+    label: action.label,
   };
 }
 
 function toResultDetails(
-  details: Readonly<Record<string, unknown>>
+  details: Readonly<Record<string, unknown>>,
 ): Readonly<Record<string, unknown>> {
-  return Object.fromEntries(
-    Object.entries(details).filter(([, value]) => value !== undefined)
-  );
+  return Object.fromEntries(Object.entries(details).filter(([, value]) => value !== undefined));
 }
 
 function makeInputResult(
   session: DesktopSession,
   actionType: string,
-  details: Readonly<Record<string, unknown>>
+  details: Readonly<Record<string, unknown>>,
 ): InputActionResult {
   return {
     sessionId: session.id,
     actionType,
     createdAt: isoNow(),
     success: true,
-    details: toResultDetails(details)
+    details: toResultDetails(details),
   };
 }
 

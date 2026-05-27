@@ -1,12 +1,12 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { DisplayAllocator } from "./displayAllocator.js";
 
 test("DisplayAllocator skips displays reported as in use", async () => {
   const allocator = new DisplayAllocator({
     min: 90,
     max: 91,
-    isDisplayInUse: (displayNumber) => displayNumber === 90
+    isDisplayInUse: (displayNumber) => displayNumber === 90,
   });
 
   const allocated = await allocator.allocate();
@@ -20,7 +20,7 @@ test("DisplayAllocator releases displays for reuse", async () => {
   const allocator = new DisplayAllocator({
     min: 90,
     max: 90,
-    isDisplayInUse: () => false
+    isDisplayInUse: () => false,
   });
 
   const first = await allocator.allocate();

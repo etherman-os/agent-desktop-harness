@@ -10,5 +10,5 @@ export type {
   ElectronFillOptions,
   ElectronOpenOptions,
   ElectronPressOptions,
-  ElectronScreenshotOptions
+  ElectronScreenshotOptions,
 } from "./electronTypes.js";

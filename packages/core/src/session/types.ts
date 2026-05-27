@@ -3,7 +3,7 @@ import type {
   InputAction,
   ScreenshotResult,
   SessionConfig,
-  SessionId
+  SessionId,
 } from "../types.js";
 
 export interface SessionManagerPort {

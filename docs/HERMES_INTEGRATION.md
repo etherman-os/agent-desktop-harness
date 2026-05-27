@@ -250,7 +250,94 @@ curl -X POST http://127.0.0.1:7341/sessions/<sessionId>/visual/assert-changed \
 14. `DELETE /sessions/:sessionId` to stop processes and generate `report.md`.
 15. `GET /sessions/:sessionId/evidence/report` while the server process is still running.
 
-The HTTP server is local-only by default and binds to `127.0.0.1`. Do not expose it to the public internet.
+The HTTP server is local-only and accepts loopback bind hosts only: `127.0.0.1`, `localhost`, or `::1`. Do not expose it to the public internet.
+
+## Hermes Studio Capture Contract Smoke
+
+Hermes Studio Harness Capture V1 expects an external harness boundary that returns a verifiable local file before Studio creates evidence. This repository provides a local CLI smoke that proves that contract without using the user's real desktop:
+
+```sh
+pnpm smoke:studio-capture-contract
+```
+
+The command:
+
+1. Starts a tiny HTTP page on `127.0.0.1` only.
+2. Creates an isolated Xvfb session through `SessionManager`.
+3. Opens the local URL in a detected GUI browser. Override detection with `AGENT_DESKTOP_HARNESS_BROWSER=/path/to/browser` when needed.
+4. Captures an X11 screenshot.
+5. Copies the screenshot to a deterministic path:
+
+```text
+.desktop-harness/studio-capture-contract/screenshot.png
+```
+
+6. Verifies the PNG exists, is non-empty, and has a PNG signature.
+7. Emits structured JSON. A successful response has this shape:
+
+```json
+{
+  "ok": true,
+  "type": "screenshot",
+  "local_path": "/path/to/agent-desktop-harness/.desktop-harness/studio-capture-contract/screenshot.png",
+  "title": "Hermes Studio Capture Contract",
+  "metadata": {
+    "contract": "hermes-studio-harness-capture-v1",
+    "target_type": "url",
+    "target": "http://127.0.0.1:41037/",
+    "output_path_requested": "/path/to/agent-desktop-harness/.desktop-harness/studio-capture-contract/screenshot.png",
+    "verified_exists": true,
+    "file_size_bytes": 12345,
+    "sha256": "64-character-sha256",
+    "session_id": "session-uuid",
+    "display": ":101",
+    "evidence_path": "/path/to/agent-desktop-harness/.desktop-harness/sessions/session-uuid",
+    "source_screenshot_path": "/path/to/agent-desktop-harness/.desktop-harness/sessions/session-uuid/screenshots/0001-studio-capture-contract.png",
+    "browser_command": "chromium",
+    "browser_path": "/usr/bin/chromium",
+    "browser_source": "path",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    }
+  },
+  "warnings": [],
+  "errors": []
+}
+```
+
+Useful options:
+
+```sh
+pnpm --filter @agent-desktop-harness/cli dev -- smoke-studio-capture-contract \
+  --output /tmp/hermes-studio-harness-capture.png \
+  --title "Hermes Studio Capture Contract" \
+  --width 1280 \
+  --height 800
+```
+
+Hermes Studio should treat this as the minimal CLI capture contract:
+
+- Execute the command as a local process.
+- Parse stdout as JSON.
+- Require `ok === true`.
+- Require `type === "screenshot"`.
+- Require `metadata.verified_exists === true`.
+- Verify `local_path` exists on local disk before creating a Studio evidence record.
+- Treat non-empty `errors` or `ok === false` as an honest unavailable/incomplete capture. Do not create fake evidence.
+
+The current HTTP API can provide the same low-level path when Studio owns orchestration:
+
+```text
+POST /sessions
+POST /sessions/:sessionId/launch
+POST /sessions/:sessionId/wait-for-window
+POST /sessions/:sessionId/wait-for-stable-screen
+POST /sessions/:sessionId/screenshot
+DELETE /sessions/:sessionId
+```
+
+For HTTP mode, Studio should start the server on `127.0.0.1` only, launch an allowlisted browser or app command inside the isolated session, call `POST /sessions/:sessionId/screenshot`, then verify the returned `screenshot.path` exists before creating evidence. There is no public endpoint and no authentication layer; do not bind or proxy this API outside loopback.
 
 ## Visual Annotation Handoff
 

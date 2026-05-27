@@ -1,33 +1,7 @@
-import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import type { ChildProcess } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
-import type {
-  ActionLogRecord,
-  ClickAction,
-  CreateAnnotationInput,
-  DesktopSession,
-  FocusWindowTarget,
-  HotkeyAction,
-  InputActionResult,
-  LaunchConfig,
-  LaunchResult,
-  ScrollAction,
-  ScreenshotAnnotation,
-  ScreenshotArtifact,
-  ScreenshotOptions,
-  ScreenshotResult,
-  SessionConfig,
-  SessionId,
-  TypeTextAction,
-  WaitForStableScreenOptions,
-  WaitForStableScreenResult,
-  WaitForWindowOptions,
-  VisualHandoff,
-  WindowActionResult,
-  WindowFilter,
-  WindowInfo
-} from "../types.js";
+import type { StartedXvfbDisplay, XvfbDisplay } from "../display/XvfbDisplay.js";
 import type {
   BrowserActionResult,
   BrowserAssertTextOptions,
@@ -37,32 +11,20 @@ import type {
   BrowserOpenOptions,
   BrowserPageRef,
   BrowserPressOptions,
-  BrowserScreenshotOptions
+  BrowserScreenshotOptions,
 } from "../drivers/browser/browserTypes.js";
 import { PlaywrightBrowserDriver } from "../drivers/browser/PlaywrightBrowserDriver.js";
 import type {
-  TauriActionResult,
-  TauriAssertTextOptions,
-  TauriClickOptions,
-  TauriDriver,
-  TauriDriverStatus,
-  TauriFillOptions,
-  TauriOpenOptions,
-  TauriAppRef,
-  TauriScreenshotOptions
-} from "../drivers/tauri/tauriTypes.js";
-import { TauriWebDriverDriver } from "../drivers/tauri/TauriWebDriverDriver.js";
-import type {
   ElectronActionResult,
+  ElectronAppRef,
   ElectronAssertTextOptions,
   ElectronClickOptions,
   ElectronDriver,
   ElectronDriverStatus,
   ElectronFillOptions,
   ElectronOpenOptions,
-  ElectronAppRef,
   ElectronPressOptions,
-  ElectronScreenshotOptions
+  ElectronScreenshotOptions,
 } from "../drivers/electron/electronTypes.js";
 import { PlaywrightElectronDriver } from "../drivers/electron/PlaywrightElectronDriver.js";
 import type {
@@ -78,14 +40,71 @@ import type {
   DriverRouteRequest,
   DriverRouterStatus,
   RoutedAppRecord,
-  RoutedDriverKind
+  RoutedDriverKind,
 } from "../drivers/router/driverRouterTypes.js";
+import { makeDriverRouterStatus, selectDriver } from "../drivers/router/driverSelection.js";
+import { TauriWebDriverDriver } from "../drivers/tauri/TauriWebDriverDriver.js";
+import type {
+  TauriActionResult,
+  TauriAppRef,
+  TauriAssertTextOptions,
+  TauriClickOptions,
+  TauriDriver,
+  TauriDriverStatus,
+  TauriFillOptions,
+  TauriOpenOptions,
+  TauriScreenshotOptions,
+} from "../drivers/tauri/tauriTypes.js";
+import { ProcessError, SessionNotFoundError } from "../errors.js";
+import type { EvidenceStore } from "../evidence/EvidenceStore.js";
+import { InputService } from "../input/InputService.js";
+import { makeTypeTextDetails } from "../input/XdotoolInputBackend.js";
+import { LiveObserverService } from "../observer/LiveObserverService.js";
+import { redactObserverStartDetails } from "../observer/NoVncObserver.js";
+import type {
+  LiveObserverRef,
+  LiveObserverStatus,
+  StartLiveObserverOptions,
+  StopLiveObserverResult,
+} from "../observer/observerTypes.js";
+import { PolicyValidator } from "../policy/PolicyValidator.js";
+import { ScreenshotService } from "../screenshot/ScreenshotService.js";
+import type {
+  ActionLogRecord,
+  ClickAction,
+  CreateAnnotationInput,
+  DesktopSession,
+  FocusWindowTarget,
+  HotkeyAction,
+  InputActionResult,
+  LaunchConfig,
+  LaunchResult,
+  ScreenshotAnnotation,
+  ScreenshotArtifact,
+  ScreenshotOptions,
+  ScreenshotResult,
+  ScrollAction,
+  SessionConfig,
+  SessionId,
+  TypeTextAction,
+  VisualHandoff,
+  WaitForStableScreenOptions,
+  WaitForStableScreenResult,
+  WaitForWindowOptions,
+  WindowActionResult,
+  WindowFilter,
+  WindowInfo,
+} from "../types.js";
 import {
-  makeDriverRouterStatus,
-  selectDriver
-} from "../drivers/router/driverSelection.js";
-import { VisualQaService } from "../visual/VisualQaService.js";
+  createSanitizedEnvironment,
+  findExecutableOnPath,
+  waitForSpawn,
+} from "../utils/command.js";
+import { ensureDirectory, fileSize, hashFile } from "../utils/fs.js";
+import { isoNow, now } from "../utils/time.js";
 import { checkRegionOverlaps } from "../visual/geometry.js";
+import { clampImageRegion, readPngSize } from "../visual/imageDiff.js";
+import { VisualQaService } from "../visual/VisualQaService.js";
 import type {
   AnnotationRegionOptions,
   AnnotationRegionResult,
@@ -95,44 +114,22 @@ import type {
   SaveVisualBaselineOptions,
   VisualAssertAnnotationChangedOptions,
   VisualAssertAnnotationSimilarOptions,
-  VisualAssertChangedOptions,
   VisualAssertChangeContainedOptions,
+  VisualAssertChangedOptions,
+  VisualAssertionKind,
   VisualAssertSimilarOptions,
   VisualBaselineRef,
   VisualChangeContainmentResult,
   VisualCheckRegionOverlapOptions,
-  VisualAssertionKind,
   VisualCompareOptions,
-  VisualCompareResult
+  VisualCompareResult,
 } from "../visual/visualTypes.js";
-import { clampImageRegion, readPngSize } from "../visual/imageDiff.js";
-import { LiveObserverService } from "../observer/LiveObserverService.js";
-import type {
-  LiveObserverRef,
-  LiveObserverStatus,
-  StartLiveObserverOptions,
-  StopLiveObserverResult
-} from "../observer/observerTypes.js";
-import { redactObserverStartDetails } from "../observer/NoVncObserver.js";
-import { XvfbDisplay } from "../display/XvfbDisplay.js";
-import type { StartedXvfbDisplay } from "../display/XvfbDisplay.js";
-import { EvidenceStore } from "../evidence/EvidenceStore.js";
-import { InputService } from "../input/InputService.js";
-import { makeTypeTextDetails } from "../input/XdotoolInputBackend.js";
-import { PolicyValidator } from "../policy/PolicyValidator.js";
-import { ScreenshotService } from "../screenshot/ScreenshotService.js";
 import { WindowService } from "../window/WindowService.js";
 import { findBestWindow } from "../window/windowFilters.js";
-import { DisplayAllocator } from "./displayAllocator.js";
+import type { DisplayAllocator } from "./displayAllocator.js";
 import { terminateProcessTree } from "./processTree.js";
-import { ProcessError, SessionNotFoundError } from "../errors.js";
-import {
-  createSanitizedEnvironment,
-  findExecutableOnPath,
-  waitForSpawn
-} from "../utils/command.js";
-import { ensureDirectory, fileSize, hashFile } from "../utils/fs.js";
-import { isoNow, now } from "../utils/time.js";
+import type { ManagedSession } from "./SessionRegistry.js";
+import { SessionRegistry } from "./SessionRegistry.js";
 
 export interface SessionManagerOptions {
   readonly displayAllocator?: DisplayAllocator;
@@ -153,20 +150,8 @@ interface ManagedRoutedApp extends RoutedAppRecord {
   readonly processId?: number;
 }
 
-interface ManagedSession {
-  session: DesktopSession;
-  readonly xvfbProcess?: ChildProcess;
-  readonly windowManagerProcess?: ChildProcess;
-  readonly appProcesses: ChildProcess[];
-  screenshotSequence: number;
-  displayReleased: boolean;
-}
-
 export class SessionManager {
-  private readonly sessions = new Map<SessionId, ManagedSession>();
-  private readonly displayAllocator: DisplayAllocator;
-  private readonly displayBackend: XvfbDisplay;
-  private readonly evidenceStore: EvidenceStore;
+  private readonly registry: SessionRegistry;
   private readonly inputService: InputService;
   private readonly policyValidator: PolicyValidator;
   private readonly screenshotService: ScreenshotService;
@@ -181,9 +166,11 @@ export class SessionManager {
   private readonly lastRoutedAppBySession = new Map<SessionId, string>();
 
   constructor(options: SessionManagerOptions = {}) {
-    this.displayAllocator = options.displayAllocator ?? new DisplayAllocator();
-    this.displayBackend = options.displayBackend ?? new XvfbDisplay();
-    this.evidenceStore = options.evidenceStore ?? new EvidenceStore();
+    this.registry = new SessionRegistry(
+      options.displayAllocator,
+      options.displayBackend,
+      options.evidenceStore,
+    );
     this.inputService = options.inputService ?? new InputService();
     this.policyValidator = options.policyValidator ?? new PolicyValidator();
     this.screenshotService = options.screenshotService ?? new ScreenshotService();
@@ -200,9 +187,7 @@ export class SessionManager {
     const normalizedConfig: SessionConfig = {
       ...config,
       workspacePath,
-      evidenceRootPath: config.evidenceRootPath
-        ? resolve(config.evidenceRootPath)
-        : undefined
+      evidenceRootPath: config.evidenceRootPath ? resolve(config.evidenceRootPath) : undefined,
     };
 
     this.policyValidator.validateSessionConfig(normalizedConfig);
@@ -211,14 +196,14 @@ export class SessionManager {
     const width = normalizedConfig.display?.width ?? 1440;
     const height = normalizedConfig.display?.height ?? 900;
     const depth = normalizedConfig.display?.depth ?? 24;
-    const allocatedDisplay = await this.displayAllocator.allocate(
-      normalizedConfig.display?.displayNumberRange
+    const allocatedDisplay = await this.registry.displayAllocator.allocate(
+      normalizedConfig.display?.displayNumberRange,
     );
     const sessionId = randomUUID();
-    const evidencePath = this.evidenceStore.getSessionPath(
+    const evidencePath = this.registry.evidenceStore.getSessionPath(
       workspacePath,
       sessionId,
-      normalizedConfig.evidenceRootPath
+      normalizedConfig.evidenceRootPath,
     );
 
     let session: DesktopSession = {
@@ -235,29 +220,29 @@ export class SessionManager {
       height,
       depth,
       processIds: {
-        apps: []
+        apps: [],
       },
-      warnings: []
+      warnings: [],
     };
 
     let startedDisplay: StartedXvfbDisplay | undefined;
 
     try {
-      await this.evidenceStore.createSession(session);
-      await this.appendAction(session, "session.created", "ok", {
+      await this.registry.evidenceStore.createSession(session);
+      await this.registry.appendAction(session, "session.created", "ok", {
         display: session.display,
         width,
         height,
         depth,
         workspacePath,
-        evidencePath
+        evidencePath,
       });
 
-      startedDisplay = await this.displayBackend.start({
+      startedDisplay = await this.registry.displayBackend.start({
         display: allocatedDisplay.value,
         width,
         height,
-        depth
+        depth,
       });
 
       session = {
@@ -266,9 +251,9 @@ export class SessionManager {
         processIds: {
           xvfb: startedDisplay.xvfbProcess.pid,
           windowManager: startedDisplay.windowManagerProcess?.pid,
-          apps: []
+          apps: [],
         },
-        warnings: startedDisplay.warnings
+        warnings: startedDisplay.warnings,
       };
 
       const managed: ManagedSession = {
@@ -277,36 +262,36 @@ export class SessionManager {
         windowManagerProcess: startedDisplay.windowManagerProcess,
         appProcesses: [],
         screenshotSequence: 0,
-        displayReleased: false
+        displayReleased: false,
       };
-      this.sessions.set(session.id, managed);
+      this.registry.sessions.set(session.id, managed);
 
-      await this.evidenceStore.writeSession(session);
-      await this.appendAction(session, "display.started", "ok", {
+      await this.registry.evidenceStore.writeSession(session);
+      await this.registry.appendAction(session, "display.started", "ok", {
         display: session.display,
         pid: session.processIds.xvfb,
         width,
         height,
-        depth
+        depth,
       });
-      await this.appendAction(session, "window_manager.started", "ok", {
+      await this.registry.appendAction(session, "window_manager.started", "ok", {
         command: "openbox",
         pid: session.processIds.windowManager,
         skipped: session.processIds.windowManager === undefined,
-        warnings: session.warnings
+        warnings: session.warnings,
       });
 
       if (normalizedConfig.command) {
         const [command, ...args] = normalizedConfig.command;
         if (!command) {
-          throw new ProcessError("SessionConfig.command cannot be an empty array.");
+          throw new ProcessError("SessionConfig.command cannot be an empty string.");
         }
         await this.launchApp(session.id, {
           command,
           args,
-          cwd: workspacePath
+          cwd: workspacePath,
         });
-        session = this.requireManagedSession(session.id).session;
+        session = this.registry.requireManagedSession(session.id).session;
       }
 
       return session;
@@ -314,34 +299,37 @@ export class SessionManager {
       const failedSession = {
         ...session,
         status: "failed" as const,
-        warnings: [
-          ...session.warnings,
-          error instanceof Error ? error.message : String(error)
-        ]
+        warnings: [...session.warnings, error instanceof Error ? error.message : String(error)],
       };
 
       try {
-        await this.appendAction(failedSession, "error", "failed", {
-          phase: "createSession"
-        }, error);
-        await this.evidenceStore.writeSession(failedSession);
-      } catch {
-        // If evidence creation itself failed, preserve the original startup error.
+        await this.registry.appendAction(
+          failedSession,
+          "error",
+          "failed",
+          {
+            phase: "createSession",
+          },
+          error,
+        );
+        await this.registry.evidenceStore.writeSession(failedSession);
+      } catch (evidenceError) {
+        console.error("Failed to record session evidence:", evidenceError);
       }
       if (startedDisplay) {
         await terminateProcessTree(startedDisplay.windowManagerProcess).catch(() => undefined);
         await terminateProcessTree(startedDisplay.xvfbProcess).catch(() => undefined);
       }
-      this.sessions.delete(session.id);
-      this.displayAllocator.release(allocatedDisplay.number);
+      this.registry.sessions.delete(session.id);
+      this.registry.displayAllocator.release(allocatedDisplay.number);
       throw error;
     }
   }
 
   async launchApp(sessionId: SessionId, launch: LaunchConfig): Promise<LaunchResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
     this.policyValidator.validateLaunchConfig(session, launch);
 
     const args = [...(launch.args ?? [])];
@@ -349,13 +337,19 @@ export class SessionManager {
     const executable = await findExecutableOnPath(launch.command, process.env, cwd);
     if (!executable) {
       const error = new ProcessError(
-        `Launch command was not found or is not executable: ${launch.command}`
+        `Launch command was not found or is not executable: ${launch.command}`,
       );
-      await this.appendAction(session, "app.launched", "failed", {
-        command: launch.command,
-        argCount: args.length,
-        cwd
-      }, error);
+      await this.registry.appendAction(
+        session,
+        "app.launched",
+        "failed",
+        {
+          command: launch.command,
+          argCount: args.length,
+          cwd,
+        },
+        error,
+      );
       throw error;
     }
 
@@ -366,38 +360,44 @@ export class SessionManager {
         ...session.config.env,
         ...launch.env,
         DISPLAY: session.display,
-        AGENT_DESKTOP_HARNESS_SESSION_ID: session.id
+        AGENT_DESKTOP_HARNESS_SESSION_ID: session.id,
       }),
       shell: false,
-      stdio: "ignore"
+      stdio: "ignore",
     });
 
     try {
       await waitForSpawn(child, launch.command);
     } catch (error) {
-      await this.appendAction(session, "app.launched", "failed", {
-        command: launch.command,
-        argCount: args.length,
-        cwd
-      }, error);
+      await this.registry.appendAction(
+        session,
+        "app.launched",
+        "failed",
+        {
+          command: launch.command,
+          argCount: args.length,
+          cwd,
+        },
+        error,
+      );
       throw error;
     }
 
     managed.appProcesses.push(child);
-    const updatedSession = this.updateManagedSession(managed, {
+    const updatedSession = this.registry.updateManagedSession(managed, {
       processIds: {
         ...session.processIds,
         apps: managed.appProcesses
           .map((processHandle) => processHandle.pid)
-          .filter((pid): pid is number => pid !== undefined)
-      }
+          .filter((pid): pid is number => pid !== undefined),
+      },
     });
-    await this.evidenceStore.writeSession(updatedSession);
-    await this.appendAction(updatedSession, "app.launched", "ok", {
+    await this.registry.evidenceStore.writeSession(updatedSession);
+    await this.registry.appendAction(updatedSession, "app.launched", "ok", {
       command: launch.command,
       args,
       cwd,
-      pid: child.pid
+      pid: child.pid,
     });
 
     if (child.pid === undefined) {
@@ -411,44 +411,45 @@ export class SessionManager {
       args,
       cwd,
       display: session.display,
-      startedAt: now()
+      startedAt: now(),
     };
   }
 
   async captureScreenshot(
     sessionId: SessionId,
-    options: ScreenshotOptions = {}
+    options: ScreenshotOptions = {},
   ): Promise<ScreenshotResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     const sequence = managed.screenshotSequence + 1;
-    const filePath = this.evidenceStore.getScreenshotPath(session, sequence, options);
+    const filePath = this.registry.evidenceStore.getScreenshotPath(session, sequence, options);
 
     try {
-      const result = await this.screenshotService.capture(
-        session,
-        filePath,
-        sequence,
-        options
-      );
+      const result = await this.screenshotService.capture(session, filePath, sequence, options);
       managed.screenshotSequence = sequence;
-      await this.appendAction(session, "screenshot.captured", "ok", {
+      await this.registry.appendAction(session, "screenshot.captured", "ok", {
         path: result.path,
         display: result.display,
         sequence: result.sequence,
         label: result.label,
-        transient: options.transient === true
+        transient: options.transient === true,
       });
       return result;
     } catch (error) {
-      await this.appendAction(session, "screenshot.captured", "failed", {
-        display: session.display,
-        sequence,
-        label: options.label,
-        transient: options.transient === true
-      }, error);
+      await this.registry.appendAction(
+        session,
+        "screenshot.captured",
+        "failed",
+        {
+          display: session.display,
+          sequence,
+          label: options.label,
+          transient: options.transient === true,
+        },
+        error,
+      );
       throw error;
     }
   }
@@ -461,9 +462,9 @@ export class SessionManager {
         x: action.x,
         y: action.y,
         button: action.button ?? "left",
-        label: action.label
+        label: action.label,
       },
-      async (session) => await this.inputService.click(session, action)
+      async (session) => await this.inputService.click(session, action),
     );
   }
 
@@ -475,9 +476,9 @@ export class SessionManager {
         x: action.x,
         y: action.y,
         button: action.button ?? "left",
-        label: action.label
+        label: action.label,
       },
-      async (session) => await this.inputService.doubleClick(session, action)
+      async (session) => await this.inputService.doubleClick(session, action),
     );
   }
 
@@ -487,7 +488,7 @@ export class SessionManager {
       sessionId,
       "input.type_text",
       details,
-      async (session) => await this.inputService.typeText(session, action)
+      async (session) => await this.inputService.typeText(session, action),
     );
   }
 
@@ -497,9 +498,9 @@ export class SessionManager {
       "input.hotkey",
       {
         keys: action.keys,
-        label: action.label
+        label: action.label,
       },
-      async (session) => await this.inputService.hotkey(session, action)
+      async (session) => await this.inputService.hotkey(session, action),
     );
   }
 
@@ -512,20 +513,20 @@ export class SessionManager {
         amount: action.amount ?? 1,
         x: action.x,
         y: action.y,
-        label: action.label
+        label: action.label,
       },
-      async (session) => await this.inputService.scroll(session, action)
+      async (session) => await this.inputService.scroll(session, action),
     );
   }
 
   async getWindows(sessionId: SessionId): Promise<WindowInfo[]> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     try {
       const windows = await this.windowService.getWindows(session);
-      await this.appendAction(session, "window.list", "ok", {
+      await this.registry.appendAction(session, "window.list", "ok", {
         count: windows.length,
         windows: windows.map((window) => ({
           id: window.id,
@@ -535,68 +536,59 @@ export class SessionManager {
           x: window.x,
           y: window.y,
           width: window.width,
-          height: window.height
-        }))
+          height: window.height,
+        })),
       });
       return windows;
     } catch (error) {
-      await this.appendFailure(session, "window.list", {}, error);
+      await this.registry.appendFailure(session, "window.list", {}, error);
       throw error;
     }
   }
 
-  async focusWindow(
-    sessionId: SessionId,
-    target: FocusWindowTarget
-  ): Promise<WindowActionResult> {
-    const managed = this.requireManagedSession(sessionId);
+  async focusWindow(sessionId: SessionId, target: FocusWindowTarget): Promise<WindowActionResult> {
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     try {
       const result = await this.windowService.focusWindow(session, target);
-      await this.appendAction(session, "window.focus", "ok", {
+      await this.registry.appendAction(session, "window.focus", "ok", {
         target,
-        window: result.window
+        window: result.window,
       });
       return result;
     } catch (error) {
-      await this.appendFailure(session, "window.focus", { target }, error);
+      await this.registry.appendFailure(session, "window.focus", { target }, error);
       throw error;
     }
   }
 
-  async findWindow(
-    sessionId: SessionId,
-    filter: WindowFilter
-  ): Promise<WindowInfo | undefined> {
-    const managed = this.requireManagedSession(sessionId);
+  async findWindow(sessionId: SessionId, filter: WindowFilter): Promise<WindowInfo | undefined> {
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     try {
       const windows = await this.windowService.getWindows(session);
       const window = findBestWindow(windows, filter);
-      await this.appendAction(session, "window.find", "ok", {
+      await this.registry.appendAction(session, "window.find", "ok", {
         filter,
         window,
         matched: window !== undefined,
-        candidateCount: windows.length
+        candidateCount: windows.length,
       });
       return window;
     } catch (error) {
-      await this.appendFailure(session, "window.find", { filter }, error);
+      await this.registry.appendFailure(session, "window.find", { filter }, error);
       throw error;
     }
   }
 
-  async focusBestWindow(
-    sessionId: SessionId,
-    filter: WindowFilter
-  ): Promise<WindowActionResult> {
-    const managed = this.requireManagedSession(sessionId);
+  async focusBestWindow(sessionId: SessionId, filter: WindowFilter): Promise<WindowActionResult> {
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     try {
       const window = await this.findWindow(sessionId, filter);
@@ -605,24 +597,24 @@ export class SessionManager {
       }
 
       const result = await this.windowService.focusWindow(session, { id: window.id });
-      await this.appendAction(session, "window.focus_best", "ok", {
+      await this.registry.appendAction(session, "window.focus_best", "ok", {
         filter,
-        window: result.window
+        window: result.window,
       });
       return result;
     } catch (error) {
-      await this.appendFailure(session, "window.focus_best", { filter }, error);
+      await this.registry.appendFailure(session, "window.focus_best", { filter }, error);
       throw error;
     }
   }
 
   async waitForWindow(
     sessionId: SessionId,
-    options: WaitForWindowOptions = {}
+    options: WaitForWindowOptions = {},
   ): Promise<WindowInfo> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     const timeoutMs = options.timeoutMs ?? 5000;
     const intervalMs = options.intervalMs ?? 250;
@@ -640,11 +632,11 @@ export class SessionManager {
         const window = findBestWindow(windows, options);
 
         if (window) {
-          await this.appendAction(session, "window.wait_for_window", "ok", {
+          await this.registry.appendAction(session, "window.wait_for_window", "ok", {
             filter: options,
             checks,
             elapsedMs: Date.now() - startTime,
-            window
+            window,
           });
           return window;
         }
@@ -654,22 +646,27 @@ export class SessionManager {
 
       throw new ProcessError(`No matching window appeared within ${timeoutMs}ms.`);
     } catch (error) {
-      await this.appendFailure(session, "window.wait_for_window", {
-        filter: options,
-        checks,
-        elapsedMs: Date.now() - startTime
-      }, error);
+      await this.registry.appendFailure(
+        session,
+        "window.wait_for_window",
+        {
+          filter: options,
+          checks,
+          elapsedMs: Date.now() - startTime,
+        },
+        error,
+      );
       throw error;
     }
   }
 
   async waitForStableScreen(
     sessionId: SessionId,
-    options: WaitForStableScreenOptions = {}
+    options: WaitForStableScreenOptions = {},
   ): Promise<WaitForStableScreenResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     const timeoutMs = options.timeoutMs ?? 5000;
     const intervalMs = options.intervalMs ?? 500;
@@ -678,9 +675,8 @@ export class SessionManager {
     const mode = options.mode ?? "hash";
     const fileSizeToleranceBytes =
       options.fileSizeToleranceBytes ?? (mode === "tolerant" ? 1024 : 0);
-    const maxRetainedScreenshots = options.retainOnlyLast === true
-      ? 1
-      : options.maxRetainedScreenshots;
+    const maxRetainedScreenshots =
+      options.retainOnlyLast === true ? 1 : options.maxRetainedScreenshots;
 
     if (
       timeoutMs <= 0 ||
@@ -693,7 +689,7 @@ export class SessionManager {
         (!Number.isInteger(maxRetainedScreenshots) || maxRetainedScreenshots < 1))
     ) {
       throw new ProcessError(
-        "waitForStableScreen requires positive timeoutMs, intervalMs, stableChecks, and valid retention options."
+        "waitForStableScreen requires positive timeoutMs, intervalMs, stableChecks, and valid retention options.",
       );
     }
 
@@ -709,26 +705,21 @@ export class SessionManager {
       while (Date.now() - startTime <= timeoutMs) {
         checks += 1;
         lastScreenshot = await this.captureScreenshot(sessionId, {
-          label: `${label}-${String(checks).padStart(4, "0")}`
+          label: `${label}-${String(checks).padStart(4, "0")}`,
         });
 
         const currentFingerprint = await fingerprintScreenshot(lastScreenshot.path, mode);
         retainedScreenshots.push(lastScreenshot);
         discardedScreenshotCount += await applyStableScreenshotRetention(
-          this.evidenceStore,
+          this.registry.evidenceStore,
           session,
           retainedScreenshots,
-          maxRetainedScreenshots
+          maxRetainedScreenshots,
         );
 
         if (
           previousFingerprint &&
-          fingerprintsMatch(
-            previousFingerprint,
-            currentFingerprint,
-            mode,
-            fileSizeToleranceBytes
-          )
+          fingerprintsMatch(previousFingerprint, currentFingerprint, mode, fileSizeToleranceBytes)
         ) {
           stableMatches += 1;
         } else {
@@ -745,13 +736,13 @@ export class SessionManager {
             retainedScreenshots: [...retainedScreenshots],
             discardedScreenshotCount,
             lastScreenshot,
-            reason: "stable"
+            reason: "stable",
           };
-          await this.appendAction(
+          await this.registry.appendAction(
             session,
             "screen.wait_for_stable",
             "ok",
-            stableScreenActionDetails(result)
+            stableScreenActionDetails(result),
           );
           return result;
         }
@@ -769,68 +760,75 @@ export class SessionManager {
         retainedScreenshots: [...retainedScreenshots],
         discardedScreenshotCount,
         lastScreenshot,
-        reason: "timeout"
+        reason: "timeout",
       };
-      await this.appendAction(
+      await this.registry.appendAction(
         session,
         "screen.wait_for_stable",
         "ok",
-        stableScreenActionDetails(result)
+        stableScreenActionDetails(result),
       );
       return result;
     } catch (error) {
-      await this.appendFailure(session, "screen.wait_for_stable", {
-        timeoutMs,
-        intervalMs,
-        stableChecks,
-        label,
-        mode,
-        fileSizeToleranceBytes,
-        maxRetainedScreenshots
-      }, error);
+      await this.registry.appendFailure(
+        session,
+        "screen.wait_for_stable",
+        {
+          timeoutMs,
+          intervalMs,
+          stableChecks,
+          label,
+          mode,
+          fileSizeToleranceBytes,
+          maxRetainedScreenshots,
+        },
+        error,
+      );
       throw error;
     }
   }
 
-  async openBrowser(
-    sessionId: SessionId,
-    options: BrowserOpenOptions
-  ): Promise<BrowserPageRef> {
-    const managed = this.requireManagedSession(sessionId);
+  async openBrowser(sessionId: SessionId, options: BrowserOpenOptions): Promise<BrowserPageRef> {
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     try {
       const page = await this.browserDriver.open(session, options);
-      const updatedSession = this.updateManagedSession(managed, {
-        driverKind: "browser"
+      const updatedSession = this.registry.updateManagedSession(managed, {
+        driverKind: "browser",
       });
-      await this.evidenceStore.writeSession(updatedSession);
-      await this.appendAction(updatedSession, "browser.open", "ok", {
+      await this.registry.evidenceStore.writeSession(updatedSession);
+      await this.registry.appendAction(updatedSession, "browser.open", "ok", {
         pageId: page.pageId,
         url: page.url,
         title: page.title,
         viewport: options.viewport,
         browserName: options.browserName,
         browserExecutablePath: options.browserExecutablePath,
-        label: options.label
+        label: options.label,
       });
       return page;
     } catch (error) {
-      await this.appendFailure(session, "browser.open", {
-        url: options.url,
-        viewport: options.viewport,
-        browserName: options.browserName,
-        browserExecutablePath: options.browserExecutablePath,
-        label: options.label
-      }, error);
+      await this.registry.appendFailure(
+        session,
+        "browser.open",
+        {
+          url: options.url,
+          viewport: options.viewport,
+          browserName: options.browserName,
+          browserExecutablePath: options.browserExecutablePath,
+          label: options.label,
+        },
+        error,
+      );
       throw error;
     }
   }
 
   async browserClick(
     sessionId: SessionId,
-    options: BrowserClickOptions
+    options: BrowserClickOptions,
   ): Promise<BrowserActionResult> {
     return await this.performBrowserAction(
       sessionId,
@@ -839,15 +837,15 @@ export class SessionManager {
         ...browserTargetDetails(options),
         pageId: options.pageId,
         timeoutMs: options.timeoutMs,
-        label: options.label
+        label: options.label,
       },
-      async (session) => await this.browserDriver.click(session, options)
+      async (session) => await this.browserDriver.click(session, options),
     );
   }
 
   async browserFill(
     sessionId: SessionId,
-    options: BrowserFillOptions
+    options: BrowserFillOptions,
   ): Promise<BrowserActionResult> {
     return await this.performBrowserAction(
       sessionId,
@@ -860,16 +858,16 @@ export class SessionManager {
         valueLength: options.value.length,
         value: options.secret === true ? undefined : truncateForLog(options.value),
         truncated: options.secret === true ? undefined : options.value.length > 256,
-        label: options.label
+        label: options.label,
       },
       async (session) => await this.browserDriver.fill(session, options),
-      options.secret === true ? options.value : undefined
+      options.secret === true ? options.value : undefined,
     );
   }
 
   async browserPress(
     sessionId: SessionId,
-    options: BrowserPressOptions
+    options: BrowserPressOptions,
   ): Promise<BrowserActionResult> {
     return await this.performBrowserAction(
       sessionId,
@@ -879,15 +877,15 @@ export class SessionManager {
         pageId: options.pageId,
         key: options.key,
         timeoutMs: options.timeoutMs,
-        label: options.label
+        label: options.label,
       },
-      async (session) => await this.browserDriver.press(session, options)
+      async (session) => await this.browserDriver.press(session, options),
     );
   }
 
   async browserAssertText(
     sessionId: SessionId,
-    options: BrowserAssertTextOptions
+    options: BrowserAssertTextOptions,
   ): Promise<BrowserActionResult> {
     return await this.performBrowserAction(
       sessionId,
@@ -896,73 +894,73 @@ export class SessionManager {
         pageId: options.pageId,
         text: options.text,
         timeoutMs: options.timeoutMs,
-        label: options.label
+        label: options.label,
       },
-      async (session) => await this.browserDriver.assertText(session, options)
+      async (session) => await this.browserDriver.assertText(session, options),
     );
   }
 
   async browserScreenshot(
     sessionId: SessionId,
-    options: BrowserScreenshotOptions = {}
+    options: BrowserScreenshotOptions = {},
   ): Promise<ScreenshotResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     const sequence = managed.screenshotSequence + 1;
-    const filePath = this.evidenceStore.getScreenshotPath(session, sequence, {
-      label: options.label
+    const filePath = this.registry.evidenceStore.getScreenshotPath(session, sequence, {
+      label: options.label,
     });
 
     try {
-      const result = await this.browserDriver.screenshot(
-        session,
-        filePath,
-        sequence,
-        options
-      );
+      const result = await this.browserDriver.screenshot(session, filePath, sequence, options);
       managed.screenshotSequence = sequence;
-      await this.appendAction(session, "screenshot.captured", "ok", {
+      await this.registry.appendAction(session, "screenshot.captured", "ok", {
         path: result.path,
         display: result.display,
         sequence: result.sequence,
         label: result.label,
         source: "browser",
         pageId: options.pageId,
-        fullPage: options.fullPage === true
+        fullPage: options.fullPage === true,
       });
-      await this.appendAction(session, "browser.screenshot", "ok", {
+      await this.registry.appendAction(session, "browser.screenshot", "ok", {
         path: result.path,
         sequence: result.sequence,
         label: result.label,
         pageId: options.pageId,
-        fullPage: options.fullPage === true
+        fullPage: options.fullPage === true,
       });
       return result;
     } catch (error) {
-      await this.appendFailure(session, "browser.screenshot", {
-        sequence,
-        label: options.label,
-        pageId: options.pageId,
-        fullPage: options.fullPage === true
-      }, error);
+      await this.registry.appendFailure(
+        session,
+        "browser.screenshot",
+        {
+          sequence,
+          label: options.label,
+          pageId: options.pageId,
+          fullPage: options.fullPage === true,
+        },
+        error,
+      );
       throw error;
     }
   }
 
   async closeBrowser(sessionId: SessionId, pageId?: string): Promise<void> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     try {
       await this.browserDriver.close(session, pageId);
-      await this.appendAction(session, "browser.close", "ok", {
-        pageId
+      await this.registry.appendAction(session, "browser.close", "ok", {
+        pageId,
       });
     } catch (error) {
-      await this.appendFailure(session, "browser.close", { pageId }, error);
+      await this.registry.appendFailure(session, "browser.close", { pageId }, error);
       throw error;
     }
   }
@@ -971,27 +969,24 @@ export class SessionManager {
     return await this.tauriDriver.getStatus();
   }
 
-  async openTauriApp(
-    sessionId: SessionId,
-    options: TauriOpenOptions
-  ): Promise<TauriAppRef> {
-    const managed = this.requireManagedSession(sessionId);
+  async openTauriApp(sessionId: SessionId, options: TauriOpenOptions): Promise<TauriAppRef> {
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
     this.policyValidator.validateLaunchConfig(session, {
       command: options.command,
       args: options.args,
       cwd: options.cwd,
-      env: options.env
+      env: options.env,
     });
 
     try {
       const app = await this.tauriDriver.open(session, options);
-      const updatedSession = this.updateManagedSession(managed, {
-        driverKind: "tauri"
+      const updatedSession = this.registry.updateManagedSession(managed, {
+        driverKind: "tauri",
       });
-      await this.evidenceStore.writeSession(updatedSession);
-      await this.appendAction(updatedSession, "tauri.open", "ok", {
+      await this.registry.evidenceStore.writeSession(updatedSession);
+      await this.registry.appendAction(updatedSession, "tauri.open", "ok", {
         appId: app.appId,
         mode: app.mode,
         webdriverUrl: app.webdriverUrl,
@@ -1003,27 +998,29 @@ export class SessionManager {
         webdriverPort: options.webdriverPort,
         nativePort: options.nativePort,
         applicationPath: options.applicationPath,
-        warnings: app.warnings
+        warnings: app.warnings,
       });
       return app;
     } catch (error) {
-      await this.appendFailure(session, "tauri.open", {
-        command: options.command,
-        argCount: options.args.length,
-        cwd: options.cwd,
-        label: options.label,
-        webdriverPort: options.webdriverPort,
-        nativePort: options.nativePort,
-        applicationPath: options.applicationPath
-      }, error);
+      await this.registry.appendFailure(
+        session,
+        "tauri.open",
+        {
+          command: options.command,
+          argCount: options.args.length,
+          cwd: options.cwd,
+          label: options.label,
+          webdriverPort: options.webdriverPort,
+          nativePort: options.nativePort,
+          applicationPath: options.applicationPath,
+        },
+        error,
+      );
       throw error;
     }
   }
 
-  async tauriClick(
-    sessionId: SessionId,
-    options: TauriClickOptions
-  ): Promise<TauriActionResult> {
+  async tauriClick(sessionId: SessionId, options: TauriClickOptions): Promise<TauriActionResult> {
     return await this.performTauriAction(
       sessionId,
       "tauri.click",
@@ -1031,16 +1028,13 @@ export class SessionManager {
         ...browserTargetDetails(options),
         appId: options.appId,
         timeoutMs: options.timeoutMs,
-        label: options.label
+        label: options.label,
       },
-      async (session) => await this.tauriDriver.click(session, options)
+      async (session) => await this.tauriDriver.click(session, options),
     );
   }
 
-  async tauriFill(
-    sessionId: SessionId,
-    options: TauriFillOptions
-  ): Promise<TauriActionResult> {
+  async tauriFill(sessionId: SessionId, options: TauriFillOptions): Promise<TauriActionResult> {
     return await this.performTauriAction(
       sessionId,
       "tauri.fill",
@@ -1052,16 +1046,16 @@ export class SessionManager {
         valueLength: options.value.length,
         value: options.secret === true ? undefined : truncateForLog(options.value),
         truncated: options.secret === true ? undefined : options.value.length > 256,
-        label: options.label
+        label: options.label,
       },
       async (session) => await this.tauriDriver.fill(session, options),
-      options.secret === true ? options.value : undefined
+      options.secret === true ? options.value : undefined,
     );
   }
 
   async tauriAssertText(
     sessionId: SessionId,
-    options: TauriAssertTextOptions
+    options: TauriAssertTextOptions,
   ): Promise<TauriActionResult> {
     return await this.performTauriAction(
       sessionId,
@@ -1070,23 +1064,23 @@ export class SessionManager {
         appId: options.appId,
         text: options.text,
         timeoutMs: options.timeoutMs,
-        label: options.label
+        label: options.label,
       },
-      async (session) => await this.tauriDriver.assertText(session, options)
+      async (session) => await this.tauriDriver.assertText(session, options),
     );
   }
 
   async tauriScreenshot(
     sessionId: SessionId,
-    options: TauriScreenshotOptions = {}
+    options: TauriScreenshotOptions = {},
   ): Promise<ScreenshotResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     const sequence = managed.screenshotSequence + 1;
-    const filePath = this.evidenceStore.getScreenshotPath(session, sequence, {
-      label: options.label
+    const filePath = this.registry.evidenceStore.getScreenshotPath(session, sequence, {
+      label: options.label,
     });
 
     try {
@@ -1094,52 +1088,59 @@ export class SessionManager {
         session,
         filePath,
         sequence,
-        options
+        options,
       );
-      const result = webdriverScreenshot ?? await this.captureScreenshot(sessionId, {
-        label: options.label
-      });
+      const result =
+        webdriverScreenshot ??
+        (await this.captureScreenshot(sessionId, {
+          label: options.label,
+        }));
       if (webdriverScreenshot) {
         managed.screenshotSequence = sequence;
-        await this.appendAction(session, "screenshot.captured", "ok", {
+        await this.registry.appendAction(session, "screenshot.captured", "ok", {
           path: result.path,
           display: result.display,
           sequence: result.sequence,
           label: result.label,
           source: "tauri-webdriver",
-          appId: options.appId
+          appId: options.appId,
         });
       }
-      await this.appendAction(session, "tauri.screenshot", "ok", {
+      await this.registry.appendAction(session, "tauri.screenshot", "ok", {
         path: result.path,
         sequence: result.sequence,
         label: result.label,
         appId: options.appId,
-        mode: webdriverScreenshot ? "webdriver" : "x11-fallback"
+        mode: webdriverScreenshot ? "webdriver" : "x11-fallback",
       });
       return result;
     } catch (error) {
-      await this.appendFailure(session, "tauri.screenshot", {
-        sequence,
-        label: options.label,
-        appId: options.appId
-      }, error);
+      await this.registry.appendFailure(
+        session,
+        "tauri.screenshot",
+        {
+          sequence,
+          label: options.label,
+          appId: options.appId,
+        },
+        error,
+      );
       throw error;
     }
   }
 
   async closeTauriApp(sessionId: SessionId, appId?: string): Promise<void> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     try {
       await this.tauriDriver.close(session, appId);
-      await this.appendAction(session, "tauri.close", "ok", {
-        appId
+      await this.registry.appendAction(session, "tauri.close", "ok", {
+        appId,
       });
     } catch (error) {
-      await this.appendFailure(session, "tauri.close", { appId }, error);
+      await this.registry.appendFailure(session, "tauri.close", { appId }, error);
       throw error;
     }
   }
@@ -1150,27 +1151,27 @@ export class SessionManager {
 
   async openElectronApp(
     sessionId: SessionId,
-    options: ElectronOpenOptions
+    options: ElectronOpenOptions,
   ): Promise<ElectronAppRef> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
     if (options.command) {
       this.policyValidator.validateLaunchConfig(session, {
         command: options.command,
         args: options.args ?? [],
         cwd: options.cwd,
-        env: options.env
+        env: options.env,
       });
     }
 
     try {
       const app = await this.electronDriver.open(session, options);
-      const updatedSession = this.updateManagedSession(managed, {
-        driverKind: "electron"
+      const updatedSession = this.registry.updateManagedSession(managed, {
+        driverKind: "electron",
       });
-      await this.evidenceStore.writeSession(updatedSession);
-      await this.appendAction(updatedSession, "electron.open", "ok", {
+      await this.registry.evidenceStore.writeSession(updatedSession);
+      await this.registry.appendAction(updatedSession, "electron.open", "ok", {
         appId: app.appId,
         mode: app.mode,
         processId: app.processId,
@@ -1183,27 +1184,32 @@ export class SessionManager {
         label: options.label,
         windowTitleIncludes: options.windowTitleIncludes,
         excludeDevtools: options.excludeDevtools === true,
-        warnings: app.warnings
+        warnings: app.warnings,
       });
       return app;
     } catch (error) {
-      await this.appendFailure(session, "electron.open", {
-        command: options.command,
-        argCount: options.args?.length ?? 0,
-        cwd: options.cwd,
-        executablePath: options.executablePath,
-        appPath: options.appPath,
-        label: options.label,
-        windowTitleIncludes: options.windowTitleIncludes,
-        excludeDevtools: options.excludeDevtools === true
-      }, error);
+      await this.registry.appendFailure(
+        session,
+        "electron.open",
+        {
+          command: options.command,
+          argCount: options.args?.length ?? 0,
+          cwd: options.cwd,
+          executablePath: options.executablePath,
+          appPath: options.appPath,
+          label: options.label,
+          windowTitleIncludes: options.windowTitleIncludes,
+          excludeDevtools: options.excludeDevtools === true,
+        },
+        error,
+      );
       throw error;
     }
   }
 
   async electronClick(
     sessionId: SessionId,
-    options: ElectronClickOptions
+    options: ElectronClickOptions,
   ): Promise<ElectronActionResult> {
     return await this.performElectronAction(
       sessionId,
@@ -1212,15 +1218,15 @@ export class SessionManager {
         ...browserTargetDetails(options),
         appId: options.appId,
         timeoutMs: options.timeoutMs,
-        label: options.label
+        label: options.label,
       },
-      async (session) => await this.electronDriver.click(session, options)
+      async (session) => await this.electronDriver.click(session, options),
     );
   }
 
   async electronFill(
     sessionId: SessionId,
-    options: ElectronFillOptions
+    options: ElectronFillOptions,
   ): Promise<ElectronActionResult> {
     return await this.performElectronAction(
       sessionId,
@@ -1233,16 +1239,16 @@ export class SessionManager {
         valueLength: options.value.length,
         value: options.secret === true ? undefined : truncateForLog(options.value),
         truncated: options.secret === true ? undefined : options.value.length > 256,
-        label: options.label
+        label: options.label,
       },
       async (session) => await this.electronDriver.fill(session, options),
-      options.secret === true ? options.value : undefined
+      options.secret === true ? options.value : undefined,
     );
   }
 
   async electronPress(
     sessionId: SessionId,
-    options: ElectronPressOptions
+    options: ElectronPressOptions,
   ): Promise<ElectronActionResult> {
     return await this.performElectronAction(
       sessionId,
@@ -1252,15 +1258,15 @@ export class SessionManager {
         appId: options.appId,
         key: options.key,
         timeoutMs: options.timeoutMs,
-        label: options.label
+        label: options.label,
       },
-      async (session) => await this.electronDriver.press(session, options)
+      async (session) => await this.electronDriver.press(session, options),
     );
   }
 
   async electronAssertText(
     sessionId: SessionId,
-    options: ElectronAssertTextOptions
+    options: ElectronAssertTextOptions,
   ): Promise<ElectronActionResult> {
     return await this.performElectronAction(
       sessionId,
@@ -1269,23 +1275,23 @@ export class SessionManager {
         appId: options.appId,
         text: options.text,
         timeoutMs: options.timeoutMs,
-        label: options.label
+        label: options.label,
       },
-      async (session) => await this.electronDriver.assertText(session, options)
+      async (session) => await this.electronDriver.assertText(session, options),
     );
   }
 
   async electronScreenshot(
     sessionId: SessionId,
-    options: ElectronScreenshotOptions = {}
+    options: ElectronScreenshotOptions = {},
   ): Promise<ScreenshotResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     const sequence = managed.screenshotSequence + 1;
-    const filePath = this.evidenceStore.getScreenshotPath(session, sequence, {
-      label: options.label
+    const filePath = this.registry.evidenceStore.getScreenshotPath(session, sequence, {
+      label: options.label,
     });
 
     try {
@@ -1293,55 +1299,62 @@ export class SessionManager {
         session,
         filePath,
         sequence,
-        options
+        options,
       );
-      const result = electronScreenshot ?? await this.captureScreenshot(sessionId, {
-        label: options.label
-      });
+      const result =
+        electronScreenshot ??
+        (await this.captureScreenshot(sessionId, {
+          label: options.label,
+        }));
       if (electronScreenshot) {
         managed.screenshotSequence = sequence;
-        await this.appendAction(session, "screenshot.captured", "ok", {
+        await this.registry.appendAction(session, "screenshot.captured", "ok", {
           path: result.path,
           display: result.display,
           sequence: result.sequence,
           label: result.label,
           source: "electron-playwright",
           appId: options.appId,
-          fullPage: options.fullPage === true
+          fullPage: options.fullPage === true,
         });
       }
-      await this.appendAction(session, "electron.screenshot", "ok", {
+      await this.registry.appendAction(session, "electron.screenshot", "ok", {
         path: result.path,
         sequence: result.sequence,
         label: result.label,
         appId: options.appId,
         fullPage: options.fullPage === true,
-        mode: electronScreenshot ? "playwright-electron" : "x11-fallback"
+        mode: electronScreenshot ? "playwright-electron" : "x11-fallback",
       });
       return result;
     } catch (error) {
-      await this.appendFailure(session, "electron.screenshot", {
-        sequence,
-        label: options.label,
-        appId: options.appId,
-        fullPage: options.fullPage === true
-      }, error);
+      await this.registry.appendFailure(
+        session,
+        "electron.screenshot",
+        {
+          sequence,
+          label: options.label,
+          appId: options.appId,
+          fullPage: options.fullPage === true,
+        },
+        error,
+      );
       throw error;
     }
   }
 
   async closeElectronApp(sessionId: SessionId, appId?: string): Promise<void> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     try {
       await this.electronDriver.close(session, appId);
-      await this.appendAction(session, "electron.close", "ok", {
-        appId
+      await this.registry.appendAction(session, "electron.close", "ok", {
+        appId,
       });
     } catch (error) {
-      await this.appendFailure(session, "electron.close", { appId }, error);
+      await this.registry.appendFailure(session, "electron.close", { appId }, error);
       throw error;
     }
   }
@@ -1349,21 +1362,21 @@ export class SessionManager {
   async getDriverRouterStatus(): Promise<DriverRouterStatus> {
     return makeDriverRouterStatus({
       tauri: await this.getTauriDriverStatus(),
-      electron: await this.getElectronDriverStatus()
+      electron: await this.getElectronDriverStatus(),
     });
   }
 
   async routeDriver(
     sessionId: SessionId,
-    request: DriverRouteRequest
+    request: DriverRouteRequest,
   ): Promise<DriverRouteDecision> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     try {
       const decision = selectDriver(await this.getDriverRouterStatus(), request);
-      await this.appendAction(session, "driver.route", "ok", {
+      await this.registry.appendAction(session, "driver.route", "ok", {
         appKind: decision.appKind,
         selectedDriver: decision.selectedDriver,
         selectionMode: decision.selectionMode,
@@ -1371,53 +1384,55 @@ export class SessionManager {
         fallbackUsed: decision.fallbackUsed,
         fallbackReason: decision.fallbackReason,
         warnings: decision.warnings,
-        errors: decision.errors
+        errors: decision.errors,
       });
       return decision;
     } catch (error) {
-      await this.appendFailure(session, "driver.route", { request }, error);
+      await this.registry.appendFailure(session, "driver.route", { request }, error);
       throw error;
     }
   }
 
   async openApp(sessionId: SessionId, options: AppOpenOptions): Promise<AppRef> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
     const decision = await this.routeDriver(sessionId, {
       appKind: options.appKind,
       preferredDriver: options.preferredDriver,
       allowFallback: options.allowFallback,
-      requireSemantic: options.requireSemantic
+      requireSemantic: options.requireSemantic,
     });
 
     try {
       const app = await this.openAppWithDecision(sessionId, options, decision);
       this.rememberRoutedApp(app);
-      await this.appendAction(session, "app.open", "ok", {
+      await this.registry.appendAction(session, "app.open", "ok", {
         appId: app.appId,
         appKind: app.appKind,
         selectedDriver: app.selectedDriver,
         semantic: app.semantic,
         fallbackUsed: app.fallbackUsed,
         warnings: app.warnings,
-        label: options.label
+        label: options.label,
       });
       return toAppRef(app);
     } catch (error) {
-      await this.appendFailure(session, "app.open", {
-        appKind: options.appKind,
-        selectedDriver: decision.selectedDriver,
-        label: options.label
-      }, error);
+      await this.registry.appendFailure(
+        session,
+        "app.open",
+        {
+          appKind: options.appKind,
+          selectedDriver: decision.selectedDriver,
+          label: options.label,
+        },
+        error,
+      );
       throw error;
     }
   }
 
-  async appClick(
-    sessionId: SessionId,
-    options: AppClickOptions
-  ): Promise<AppActionResult> {
+  async appClick(sessionId: SessionId, options: AppClickOptions): Promise<AppActionResult> {
     const app = this.requireRoutedApp(sessionId, options.appId);
     const driver = this.resolveActionDriver(app, options.preferredDriver, options.allowFallback);
 
@@ -1425,7 +1440,7 @@ export class SessionManager {
       const result = await this.browserClick(sessionId, {
         ...semanticTargetForApp(options),
         pageId: app.underlyingId,
-        timeoutMs: options.timeoutMs
+        timeoutMs: options.timeoutMs,
       });
       return this.appResult(app, driver, "app.click", result.success, result.details);
     }
@@ -1433,17 +1448,31 @@ export class SessionManager {
       const result = await this.tauriClick(sessionId, {
         ...semanticTargetForApp(options),
         appId: app.underlyingId,
-        timeoutMs: options.timeoutMs
+        timeoutMs: options.timeoutMs,
       });
-      return this.appResult(app, driver, "app.click", result.success, result.details, result.warnings);
+      return this.appResult(
+        app,
+        driver,
+        "app.click",
+        result.success,
+        result.details,
+        result.warnings,
+      );
     }
     if (driver === "electron-playwright") {
       const result = await this.electronClick(sessionId, {
         ...semanticTargetForApp(options),
         appId: app.underlyingId,
-        timeoutMs: options.timeoutMs
+        timeoutMs: options.timeoutMs,
       });
-      return this.appResult(app, driver, "app.click", result.success, result.details, result.warnings);
+      return this.appResult(
+        app,
+        driver,
+        "app.click",
+        result.success,
+        result.details,
+        result.warnings,
+      );
     }
 
     if (options.x === undefined || options.y === undefined) {
@@ -1453,15 +1482,12 @@ export class SessionManager {
       x: options.x,
       y: options.y,
       button: options.button,
-      label: options.label
+      label: options.label,
     });
     return this.appResult(app, "x11-fallback", "app.click", result.success, result.details);
   }
 
-  async appFill(
-    sessionId: SessionId,
-    options: AppFillOptions
-  ): Promise<AppActionResult> {
+  async appFill(sessionId: SessionId, options: AppFillOptions): Promise<AppActionResult> {
     const app = this.requireRoutedApp(sessionId, options.appId);
     const driver = this.resolveActionDriver(app, options.preferredDriver, options.allowFallback);
 
@@ -1471,7 +1497,7 @@ export class SessionManager {
         pageId: app.underlyingId,
         value: options.value,
         secret: options.secret,
-        timeoutMs: options.timeoutMs
+        timeoutMs: options.timeoutMs,
       });
       return this.appResult(app, driver, "app.fill", result.success, result.details);
     }
@@ -1481,9 +1507,16 @@ export class SessionManager {
         appId: app.underlyingId,
         value: options.value,
         secret: options.secret,
-        timeoutMs: options.timeoutMs
+        timeoutMs: options.timeoutMs,
       });
-      return this.appResult(app, driver, "app.fill", result.success, result.details, result.warnings);
+      return this.appResult(
+        app,
+        driver,
+        "app.fill",
+        result.success,
+        result.details,
+        result.warnings,
+      );
     }
     if (driver === "electron-playwright") {
       const result = await this.electronFill(sessionId, {
@@ -1491,32 +1524,38 @@ export class SessionManager {
         appId: app.underlyingId,
         value: options.value,
         secret: options.secret,
-        timeoutMs: options.timeoutMs
+        timeoutMs: options.timeoutMs,
       });
-      return this.appResult(app, driver, "app.fill", result.success, result.details, result.warnings);
+      return this.appResult(
+        app,
+        driver,
+        "app.fill",
+        result.success,
+        result.details,
+        result.warnings,
+      );
     }
 
     if (options.x === undefined || options.y === undefined) {
-      throw new ProcessError("appFill using X11 fallback requires x and y coordinates before typing.");
+      throw new ProcessError(
+        "appFill using X11 fallback requires x and y coordinates before typing.",
+      );
     }
     await this.click(sessionId, {
       x: options.x,
       y: options.y,
       button: options.button,
-      label: options.label
+      label: options.label,
     });
     const result = await this.typeText(sessionId, {
       text: options.value,
       secret: options.secret,
-      label: options.label
+      label: options.label,
     });
     return this.appResult(app, "x11-fallback", "app.fill", result.success, result.details);
   }
 
-  async appPress(
-    sessionId: SessionId,
-    options: AppPressOptions
-  ): Promise<AppActionResult> {
+  async appPress(sessionId: SessionId, options: AppPressOptions): Promise<AppActionResult> {
     const app = this.requireRoutedApp(sessionId, options.appId);
     const driver = this.resolveActionDriver(app, options.preferredDriver, options.allowFallback);
 
@@ -1525,7 +1564,7 @@ export class SessionManager {
         ...semanticTargetForApp(options),
         pageId: app.underlyingId,
         key: options.key,
-        timeoutMs: options.timeoutMs
+        timeoutMs: options.timeoutMs,
       });
       return this.appResult(app, driver, "app.press", result.success, result.details);
     }
@@ -1534,24 +1573,36 @@ export class SessionManager {
         ...semanticTargetForApp(options),
         appId: app.underlyingId,
         key: options.key,
-        timeoutMs: options.timeoutMs
+        timeoutMs: options.timeoutMs,
       });
-      return this.appResult(app, driver, "app.press", result.success, result.details, result.warnings);
+      return this.appResult(
+        app,
+        driver,
+        "app.press",
+        result.success,
+        result.details,
+        result.warnings,
+      );
     }
     if (driver === "tauri-webdriver") {
-      return this.unsupportedAppResult(app, driver, "app.press", "Tauri press is not implemented yet.");
+      return this.unsupportedAppResult(
+        app,
+        driver,
+        "app.press",
+        "Tauri press is not implemented yet.",
+      );
     }
 
     const result = await this.hotkey(sessionId, {
       keys: [options.key],
-      label: options.label
+      label: options.label,
     });
     return this.appResult(app, "x11-fallback", "app.press", result.success, result.details);
   }
 
   async appAssertText(
     sessionId: SessionId,
-    options: AppAssertTextOptions
+    options: AppAssertTextOptions,
   ): Promise<AppActionResult> {
     const app = this.requireRoutedApp(sessionId, options.appId);
     const driver = this.resolveActionDriver(app, options.preferredDriver, options.allowFallback);
@@ -1561,7 +1612,7 @@ export class SessionManager {
         pageId: app.underlyingId,
         text: options.text,
         timeoutMs: options.timeoutMs,
-        label: options.label
+        label: options.label,
       });
       return this.appResult(app, driver, "app.assert_text", result.success, result.details);
     }
@@ -1570,57 +1621,72 @@ export class SessionManager {
         appId: app.underlyingId,
         text: options.text,
         timeoutMs: options.timeoutMs,
-        label: options.label
+        label: options.label,
       });
-      return this.appResult(app, driver, "app.assert_text", result.success, result.details, result.warnings);
+      return this.appResult(
+        app,
+        driver,
+        "app.assert_text",
+        result.success,
+        result.details,
+        result.warnings,
+      );
     }
     if (driver === "electron-playwright") {
       const result = await this.electronAssertText(sessionId, {
         appId: app.underlyingId,
         text: options.text,
         timeoutMs: options.timeoutMs,
-        label: options.label
+        label: options.label,
       });
-      return this.appResult(app, driver, "app.assert_text", result.success, result.details, result.warnings);
+      return this.appResult(
+        app,
+        driver,
+        "app.assert_text",
+        result.success,
+        result.details,
+        result.warnings,
+      );
     }
 
     return this.unsupportedAppResult(
       app,
       "x11-fallback",
       "app.assert_text",
-      "X11 fallback cannot assert text without OCR."
+      "X11 fallback cannot assert text without OCR.",
     );
   }
 
   async appScreenshot(
     sessionId: SessionId,
-    options: AppScreenshotOptions = {}
+    options: AppScreenshotOptions = {},
   ): Promise<ScreenshotResult> {
     const app = this.requireRoutedApp(sessionId, options.appId);
     const driver = this.resolveActionDriver(app, options.preferredDriver, true);
-    const result = driver === "browser-playwright"
-      ? await this.browserScreenshot(sessionId, {
-          pageId: app.underlyingId,
-          label: options.label,
-          fullPage: options.fullPage
-        })
-      : driver === "tauri-webdriver"
-        ? await this.tauriScreenshot(sessionId, {
-            appId: app.underlyingId,
-            label: options.label
+    const result =
+      driver === "browser-playwright"
+        ? await this.browserScreenshot(sessionId, {
+            pageId: app.underlyingId,
+            label: options.label,
+            fullPage: options.fullPage,
           })
-        : driver === "electron-playwright"
-          ? await this.electronScreenshot(sessionId, {
+        : driver === "tauri-webdriver"
+          ? await this.tauriScreenshot(sessionId, {
               appId: app.underlyingId,
               label: options.label,
-              fullPage: options.fullPage
             })
-          : await this.captureScreenshot(sessionId, {
-              label: options.label
-            });
+          : driver === "electron-playwright"
+            ? await this.electronScreenshot(sessionId, {
+                appId: app.underlyingId,
+                label: options.label,
+                fullPage: options.fullPage,
+              })
+            : await this.captureScreenshot(sessionId, {
+                label: options.label,
+              });
 
-    const session = this.requireManagedSession(sessionId).session;
-    await this.appendAction(session, "app.screenshot", "ok", {
+    const session = this.registry.requireManagedSession(sessionId).session;
+    await this.registry.appendAction(session, "app.screenshot", "ok", {
       appId: app.appId,
       appKind: app.appKind,
       selectedDriver: driver,
@@ -1628,15 +1694,13 @@ export class SessionManager {
       fallbackUsed: driver === "x11-fallback",
       path: result.path,
       sequence: result.sequence,
-      label: result.label
+      label: result.label,
     });
     return result;
   }
 
   async closeApp(sessionId: SessionId, appId?: string): Promise<void> {
-    const appIds = appId
-      ? [appId]
-      : [...(this.routedAppsBySession.get(sessionId) ?? [])];
+    const appIds = appId ? [appId] : [...(this.routedAppsBySession.get(sessionId) ?? [])];
     for (const id of appIds) {
       const app = this.requireRoutedApp(sessionId, id);
       if (app.underlyingKind === "browser") {
@@ -1647,98 +1711,118 @@ export class SessionManager {
         await this.closeElectronApp(sessionId, app.underlyingId);
       }
       this.forgetRoutedApp(app);
-      await this.appendAction(this.requireManagedSession(sessionId).session, "app.close", "ok", {
-        appId: app.appId,
-        selectedDriver: app.selectedDriver
-      });
+      await this.registry.appendAction(
+        this.registry.requireManagedSession(sessionId).session,
+        "app.close",
+        "ok",
+        {
+          appId: app.appId,
+          selectedDriver: app.selectedDriver,
+        },
+      );
     }
   }
 
   async visualCompare(
     sessionId: SessionId,
-    options: VisualCompareOptions
+    options: VisualCompareOptions,
   ): Promise<VisualCompareResult> {
     return await this.performVisualQa(sessionId, "compare", options);
   }
 
   async visualAssertChanged(
     sessionId: SessionId,
-    options: VisualAssertChangedOptions
+    options: VisualAssertChangedOptions,
   ): Promise<VisualCompareResult> {
     return await this.performVisualQa(sessionId, "assert-changed", {
       ...options,
-      minDiffPixelRatio: options.minDiffPixelRatio
+      minDiffPixelRatio: options.minDiffPixelRatio,
     });
   }
 
   async visualAssertSimilar(
     sessionId: SessionId,
-    options: VisualAssertSimilarOptions
+    options: VisualAssertSimilarOptions,
   ): Promise<VisualCompareResult> {
     return await this.performVisualQa(sessionId, "assert-similar", {
       ...options,
-      maxDiffPixelRatio: options.maxDiffPixelRatio
+      maxDiffPixelRatio: options.maxDiffPixelRatio,
     });
   }
 
   async saveVisualBaseline(
     sessionId: SessionId,
-    options: SaveVisualBaselineOptions
+    options: SaveVisualBaselineOptions,
   ): Promise<VisualBaselineRef> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
     try {
-      const baseline = await this.evidenceStore.saveVisualBaseline(session, options);
-      await this.appendAction(session, "visual.baseline_saved", "ok", {
+      const baseline = await this.registry.evidenceStore.saveVisualBaseline(session, options);
+      await this.registry.appendAction(session, "visual.baseline_saved", "ok", {
         name: baseline.name,
         suite: baseline.suite ?? "default",
         path: baseline.path,
-        sourceScreenshotPath: this.evidenceStore.toEvidenceRelativePath(session, baseline.sourceScreenshotPath),
+        sourceScreenshotPath: this.registry.evidenceStore.toEvidenceRelativePath(
+          session,
+          baseline.sourceScreenshotPath,
+        ),
         width: baseline.width,
         height: baseline.height,
-        overwrite: options.overwrite === true
+        overwrite: options.overwrite === true,
       });
       return baseline;
     } catch (error) {
-      await this.appendFailure(session, "visual.baseline_saved", {
-        name: options.name,
-        suite: options.suite ?? "default",
-        screenshotPath: options.screenshotPath,
-        overwrite: options.overwrite === true
-      }, error);
+      await this.registry.appendFailure(
+        session,
+        "visual.baseline_saved",
+        {
+          name: options.name,
+          suite: options.suite ?? "default",
+          screenshotPath: options.screenshotPath,
+          overwrite: options.overwrite === true,
+        },
+        error,
+      );
       throw error;
     }
   }
 
   async listVisualBaselines(
     sessionId: SessionId,
-    options: ListVisualBaselinesOptions = {}
+    options: ListVisualBaselinesOptions = {},
   ): Promise<VisualBaselineRef[]> {
-    const managed = this.requireManagedSession(sessionId);
-    return await this.evidenceStore.listVisualBaselines(managed.session, options);
+    const managed = this.registry.requireManagedSession(sessionId);
+    return await this.registry.evidenceStore.listVisualBaselines(managed.session, options);
   }
 
   async compareVisualBaseline(
     sessionId: SessionId,
-    options: CompareVisualBaselineOptions
+    options: CompareVisualBaselineOptions,
   ): Promise<VisualCompareResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
     const suite = options.suite ?? "default";
-    const baseline = await this.evidenceStore.findVisualBaseline(
+    const baseline = await this.registry.evidenceStore.findVisualBaseline(
       session,
       options.baselineName,
-      suite
+      suite,
     );
     if (!baseline) {
       throw new ProcessError(`Visual baseline not found: ${suite}/${options.baselineName}`);
     }
-    const screenshotPath = this.evidenceStore.resolveEvidencePath(session, options.screenshotPath);
-    const diffPath = options.createDiffImage === true
-      ? await this.evidenceStore.getNextVisualDiffPath(session, options.label ?? "compare-baseline")
-      : undefined;
+    const screenshotPath = this.registry.evidenceStore.resolveEvidencePath(
+      session,
+      options.screenshotPath,
+    );
+    const diffPath =
+      options.createDiffImage === true
+        ? await this.registry.evidenceStore.getNextVisualDiffPath(
+            session,
+            options.label ?? "compare-baseline",
+          )
+        : undefined;
 
     try {
       const comparison = await this.visualQaService.compare({
@@ -1748,7 +1832,7 @@ export class SessionManager {
         diffPath,
         region: options.region,
         threshold: options.threshold,
-        maxDiffPixelRatio: options.maxDiffPixelRatio
+        maxDiffPixelRatio: options.maxDiffPixelRatio,
       });
       const result: VisualCompareResult = {
         sessionId,
@@ -1769,35 +1853,40 @@ export class SessionManager {
         maxDiffPixelRatio: comparison.maxDiffPixelRatio,
         passed: comparison.passed,
         createdAt: isoNow(),
-        warnings: comparison.warnings
+        warnings: comparison.warnings,
       };
       await this.recordVisualResult(session, "visual.compare_baseline", result);
       return result;
     } catch (error) {
-      await this.appendFailure(session, "visual.compare_baseline", {
-        baselineName: options.baselineName,
-        suite,
-        screenshotPath: options.screenshotPath,
-        label: options.label,
-        region: options.region
-      }, error);
+      await this.registry.appendFailure(
+        session,
+        "visual.compare_baseline",
+        {
+          baselineName: options.baselineName,
+          suite,
+          screenshotPath: options.screenshotPath,
+          label: options.label,
+          region: options.region,
+        },
+        error,
+      );
       throw error;
     }
   }
 
   async getAnnotationRegion(
     sessionId: SessionId,
-    options: AnnotationRegionOptions
+    options: AnnotationRegionOptions,
   ): Promise<AnnotationRegionResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     return await this.resolveAnnotationRegion(managed.session, options);
   }
 
   async visualAssertAnnotationChanged(
     sessionId: SessionId,
-    options: VisualAssertAnnotationChangedOptions
+    options: VisualAssertAnnotationChangedOptions,
   ): Promise<VisualCompareResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const annotationRegion = await this.resolveAnnotationRegion(managed.session, options);
     return await this.performVisualQa(
       sessionId,
@@ -1809,22 +1898,22 @@ export class SessionManager {
         region: annotationRegion.region,
         threshold: options.threshold,
         minDiffPixelRatio: options.minDiffPixelRatio,
-        createDiffImage: options.createDiffImage
+        createDiffImage: options.createDiffImage,
       },
       "visual.assert_annotation_changed",
       "assert-annotation-changed",
       {
         annotationId: annotationRegion.annotationId,
-        annotationNote: annotationRegion.note
-      }
+        annotationNote: annotationRegion.note,
+      },
     );
   }
 
   async visualAssertAnnotationSimilar(
     sessionId: SessionId,
-    options: VisualAssertAnnotationSimilarOptions
+    options: VisualAssertAnnotationSimilarOptions,
   ): Promise<VisualCompareResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const annotationRegion = await this.resolveAnnotationRegion(managed.session, options);
     return await this.performVisualQa(
       sessionId,
@@ -1836,36 +1925,40 @@ export class SessionManager {
         region: annotationRegion.region,
         threshold: options.threshold,
         maxDiffPixelRatio: options.maxDiffPixelRatio,
-        createDiffImage: options.createDiffImage
+        createDiffImage: options.createDiffImage,
       },
       "visual.assert_annotation_similar",
       "assert-annotation-similar",
       {
         annotationId: annotationRegion.annotationId,
-        annotationNote: annotationRegion.note
-      }
+        annotationNote: annotationRegion.note,
+      },
     );
   }
 
   async visualAssertChangeContained(
     sessionId: SessionId,
-    options: VisualAssertChangeContainedOptions
+    options: VisualAssertChangeContainedOptions,
   ): Promise<VisualChangeContainmentResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
-    const beforePath = this.evidenceStore.resolveEvidencePath(session, options.beforePath);
-    const afterPath = this.evidenceStore.resolveEvidencePath(session, options.afterPath);
-    const diffPath = options.createDiffImage === true
-      ? await this.evidenceStore.getNextVisualDiffPath(session, options.label ?? "change-contained")
-      : undefined;
+    this.registry.ensureRunning(session);
+    const beforePath = this.registry.evidenceStore.resolveEvidencePath(session, options.beforePath);
+    const afterPath = this.registry.evidenceStore.resolveEvidencePath(session, options.afterPath);
+    const diffPath =
+      options.createDiffImage === true
+        ? await this.registry.evidenceStore.getNextVisualDiffPath(
+            session,
+            options.label ?? "change-contained",
+          )
+        : undefined;
 
     try {
       const containment = await this.visualQaService.assertChangeContained({
         ...options,
         beforePath,
         afterPath,
-        diffPath
+        diffPath,
       });
       const result: VisualChangeContainmentResult = {
         sessionId,
@@ -1892,18 +1985,23 @@ export class SessionManager {
         containmentPassed: containment.containmentPassed,
         passed: containment.passed,
         createdAt: isoNow(),
-        warnings: containment.warnings
+        warnings: containment.warnings,
       };
       await this.recordVisualResult(session, "visual.assert_change_contained", result);
       return result;
     } catch (error) {
-      await this.appendFailure(session, "visual.assert_change_contained", {
-        beforePath: options.beforePath,
-        afterPath: options.afterPath,
-        allowedRegions: options.allowedRegions,
-        maxOutsideDiffPixelRatio: options.maxOutsideDiffPixelRatio,
-        minInsideDiffPixelRatio: options.minInsideDiffPixelRatio
-      }, error);
+      await this.registry.appendFailure(
+        session,
+        "visual.assert_change_contained",
+        {
+          beforePath: options.beforePath,
+          afterPath: options.afterPath,
+          allowedRegions: options.allowedRegions,
+          maxOutsideDiffPixelRatio: options.maxOutsideDiffPixelRatio,
+          minInsideDiffPixelRatio: options.minInsideDiffPixelRatio,
+        },
+        error,
+      );
       throw error;
     }
   }
@@ -1913,13 +2011,13 @@ export class SessionManager {
   }
 
   async listVisualAssertions(sessionId: SessionId): Promise<VisualCompareResult[]> {
-    const managed = this.requireManagedSession(sessionId);
-    return await this.evidenceStore.listVisualAssertions(managed.session);
+    const managed = this.registry.requireManagedSession(sessionId);
+    return await this.registry.evidenceStore.listVisualAssertions(managed.session);
   }
 
   getVisualDiffFilePath(sessionId: SessionId, fileName: string): string {
-    const managed = this.requireManagedSession(sessionId);
-    return this.evidenceStore.getVisualDiffFilePath(managed.session, fileName);
+    const managed = this.registry.requireManagedSession(sessionId);
+    return this.registry.evidenceStore.getVisualDiffFilePath(managed.session, fileName);
   }
 
   async getLiveObserverStatus(): Promise<LiveObserverStatus> {
@@ -1928,18 +2026,18 @@ export class SessionManager {
 
   async startLiveObserver(
     sessionId: SessionId,
-    options: StartLiveObserverOptions = {}
+    options: StartLiveObserverOptions = {},
   ): Promise<LiveObserverRef> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     try {
       const observer = await this.liveObserverService.start(session, {
         ...options,
-        sessionId
+        sessionId,
       });
-      await this.appendAction(session, "observer.start", "ok", {
+      await this.registry.appendAction(session, "observer.start", "ok", {
         observerId: observer.observerId,
         host: observer.host,
         vncPort: observer.vncPort,
@@ -1948,15 +2046,15 @@ export class SessionManager {
         url: observer.url,
         passwordProvided: options.password !== undefined,
         label: options.label,
-        warnings: observer.warnings
+        warnings: observer.warnings,
       });
       return observer;
     } catch (error) {
-      await this.appendFailure(
+      await this.registry.appendFailure(
         session,
         "observer.start",
         redactObserverStartDetails(options),
-        error
+        error,
       );
       throw error;
     }
@@ -1964,41 +2062,41 @@ export class SessionManager {
 
   async stopLiveObserver(
     sessionId: SessionId,
-    observerId?: string
+    observerId?: string,
   ): Promise<StopLiveObserverResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
 
     try {
       const result = await this.liveObserverService.stop(sessionId, observerId);
-      await this.appendAction(session, "observer.stop", result.stopped ? "ok" : "failed", {
+      await this.registry.appendAction(session, "observer.stop", result.stopped ? "ok" : "failed", {
         observerId: result.observerId,
-        stopped: result.stopped
+        stopped: result.stopped,
       });
       return result;
     } catch (error) {
-      await this.appendFailure(session, "observer.stop", { observerId }, error);
+      await this.registry.appendFailure(session, "observer.stop", { observerId }, error);
       throw error;
     }
   }
 
   listLiveObservers(sessionId?: SessionId): LiveObserverRef[] {
     if (sessionId) {
-      this.requireManagedSession(sessionId);
+      this.registry.requireManagedSession(sessionId);
     }
     return this.liveObserverService.list(sessionId);
   }
 
   async stopSession(sessionId: SessionId): Promise<void> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
 
     if (session.status === "stopped") {
       return;
     }
 
-    this.updateManagedSession(managed, { status: "stopping" });
-    await this.evidenceStore.writeSession(managed.session);
+    this.registry.updateManagedSession(managed, { status: "stopping" });
+    await this.registry.evidenceStore.writeSession(managed.session);
 
     const cleanupErrors: string[] = [];
 
@@ -2052,23 +2150,29 @@ export class SessionManager {
       cleanupErrors.push(error instanceof Error ? error.message : String(error));
     } finally {
       if (!managed.displayReleased) {
-        this.displayAllocator.release(session.displayNumber);
+        this.registry.displayAllocator.release(session.displayNumber);
         managed.displayReleased = true;
       }
     }
 
-    const stoppedSession = this.updateManagedSession(managed, {
+    const stoppedSession = this.registry.updateManagedSession(managed, {
       status: cleanupErrors.length === 0 ? "stopped" : "failed",
       stoppedAt: now(),
-      warnings: [...managed.session.warnings, ...cleanupErrors]
+      warnings: [...managed.session.warnings, ...cleanupErrors],
     });
 
-    await this.appendAction(stoppedSession, "session.stopped", cleanupErrors.length === 0 ? "ok" : "failed", {
-      display: stoppedSession.display,
-      processIds: stoppedSession.processIds
-    }, cleanupErrors.length > 0 ? new Error(cleanupErrors.join("; ")) : undefined);
-    await this.evidenceStore.writeSession(stoppedSession);
-    await this.evidenceStore.writeReport(stoppedSession);
+    await this.registry.appendAction(
+      stoppedSession,
+      "session.stopped",
+      cleanupErrors.length === 0 ? "ok" : "failed",
+      {
+        display: stoppedSession.display,
+        processIds: stoppedSession.processIds,
+      },
+      cleanupErrors.length > 0 ? new Error(cleanupErrors.join("; ")) : undefined,
+    );
+    await this.registry.evidenceStore.writeSession(stoppedSession);
+    await this.registry.evidenceStore.writeReport(stoppedSession);
 
     if (cleanupErrors.length > 0) {
       throw new ProcessError(`Session cleanup failed: ${cleanupErrors.join("; ")}`);
@@ -2076,27 +2180,27 @@ export class SessionManager {
   }
 
   async listScreenshots(sessionId: SessionId): Promise<ScreenshotArtifact[]> {
-    const managed = this.requireManagedSession(sessionId);
-    return await this.evidenceStore.listScreenshots(managed.session);
+    const managed = this.registry.requireManagedSession(sessionId);
+    return await this.registry.evidenceStore.listScreenshots(managed.session);
   }
 
   getScreenshotFilePath(sessionId: SessionId, fileName: string): string {
-    const managed = this.requireManagedSession(sessionId);
-    return this.evidenceStore.getScreenshotFilePath(managed.session, fileName);
+    const managed = this.registry.requireManagedSession(sessionId);
+    return this.registry.evidenceStore.getScreenshotFilePath(managed.session, fileName);
   }
 
   getAnnotationFilePath(sessionId: SessionId, fileName: string): string {
-    const managed = this.requireManagedSession(sessionId);
-    return this.evidenceStore.getAnnotationFilePath(managed.session, fileName);
+    const managed = this.registry.requireManagedSession(sessionId);
+    return this.registry.evidenceStore.getAnnotationFilePath(managed.session, fileName);
   }
 
   async createAnnotation(
     sessionId: SessionId,
-    input: CreateAnnotationInput
+    input: CreateAnnotationInput,
   ): Promise<ScreenshotAnnotation> {
-    const managed = this.requireManagedSession(sessionId);
-    const annotation = await this.evidenceStore.createAnnotation(managed.session, input);
-    await this.appendAction(managed.session, "annotation.created", "ok", {
+    const managed = this.registry.requireManagedSession(sessionId);
+    const annotation = await this.registry.evidenceStore.createAnnotation(managed.session, input);
+    await this.registry.appendAction(managed.session, "annotation.created", "ok", {
       annotationId: annotation.id,
       screenshotFileName: annotation.screenshotFileName,
       type: annotation.type,
@@ -2106,32 +2210,32 @@ export class SessionManager {
       height: annotation.height,
       x2: annotation.x2,
       y2: annotation.y2,
-      hasCrop: annotation.cropPath !== undefined
+      hasCrop: annotation.cropPath !== undefined,
     });
     return annotation;
   }
 
   async listAnnotations(sessionId: SessionId): Promise<ScreenshotAnnotation[]> {
-    const managed = this.requireManagedSession(sessionId);
-    return await this.evidenceStore.listAnnotations(managed.session);
+    const managed = this.registry.requireManagedSession(sessionId);
+    return await this.registry.evidenceStore.listAnnotations(managed.session);
   }
 
   async getVisualHandoff(sessionId: SessionId): Promise<VisualHandoff> {
-    const managed = this.requireManagedSession(sessionId);
-    return await this.evidenceStore.getVisualHandoff(managed.session);
+    const managed = this.registry.requireManagedSession(sessionId);
+    return await this.registry.evidenceStore.getVisualHandoff(managed.session);
   }
 
   async regenerateVisualHandoff(sessionId: SessionId): Promise<VisualHandoff> {
-    const managed = this.requireManagedSession(sessionId);
-    return await this.evidenceStore.regenerateVisualHandoff(managed.session);
+    const managed = this.registry.requireManagedSession(sessionId);
+    return await this.registry.evidenceStore.regenerateVisualHandoff(managed.session);
   }
 
   getSession(sessionId: SessionId): DesktopSession | undefined {
-    return this.sessions.get(sessionId)?.session;
+    return this.registry.getSession(sessionId);
   }
 
   listSessions(): DesktopSession[] {
-    return [...this.sessions.values()].map((managed) => managed.session);
+    return this.registry.listSessions();
   }
 
   async start(config: SessionConfig): Promise<DesktopSession> {
@@ -2150,18 +2254,18 @@ export class SessionManager {
     sessionId: SessionId,
     type: Extract<ActionLogRecord["type"], `input.${string}`>,
     details: Readonly<Record<string, unknown>>,
-    action: (session: DesktopSession) => Promise<InputActionResult>
+    action: (session: DesktopSession) => Promise<InputActionResult>,
   ): Promise<InputActionResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     try {
       const result = await action(session);
-      await this.appendAction(session, type, "ok", details);
+      await this.registry.appendAction(session, type, "ok", details);
       return result;
     } catch (error) {
-      await this.appendFailure(session, type, details, error);
+      await this.registry.appendFailure(session, type, details, error);
       throw error;
     }
   }
@@ -2171,21 +2275,19 @@ export class SessionManager {
     type: Extract<ActionLogRecord["type"], `browser.${string}`>,
     details: Readonly<Record<string, unknown>>,
     action: (session: DesktopSession) => Promise<BrowserActionResult>,
-    secretValue?: string
+    secretValue?: string,
   ): Promise<BrowserActionResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     try {
       const result = await action(session);
-      await this.appendAction(session, type, "ok", details);
+      await this.registry.appendAction(session, type, "ok", details);
       return result;
     } catch (error) {
-      const safeError = secretValue
-        ? redactErrorMessage(error, secretValue)
-        : error;
-      await this.appendFailure(session, type, details, safeError);
+      const safeError = secretValue ? redactErrorMessage(error, secretValue) : error;
+      await this.registry.appendFailure(session, type, details, safeError);
       throw safeError;
     }
   }
@@ -2195,26 +2297,24 @@ export class SessionManager {
     type: Extract<ActionLogRecord["type"], `tauri.${string}`>,
     details: Readonly<Record<string, unknown>>,
     action: (session: DesktopSession) => Promise<TauriActionResult>,
-    secretValue?: string
+    secretValue?: string,
   ): Promise<TauriActionResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     try {
       const result = await action(session);
-      await this.appendAction(session, type, result.success ? "ok" : "failed", {
+      await this.registry.appendAction(session, type, result.success ? "ok" : "failed", {
         ...details,
         mode: result.mode,
         success: result.success,
-        warnings: result.warnings
+        warnings: result.warnings,
       });
       return result;
     } catch (error) {
-      const safeError = secretValue
-        ? redactErrorMessage(error, secretValue)
-        : error;
-      await this.appendFailure(session, type, details, safeError);
+      const safeError = secretValue ? redactErrorMessage(error, secretValue) : error;
+      await this.registry.appendFailure(session, type, details, safeError);
       throw safeError;
     }
   }
@@ -2224,26 +2324,24 @@ export class SessionManager {
     type: Extract<ActionLogRecord["type"], `electron.${string}`>,
     details: Readonly<Record<string, unknown>>,
     action: (session: DesktopSession) => Promise<ElectronActionResult>,
-    secretValue?: string
+    secretValue?: string,
   ): Promise<ElectronActionResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
     try {
       const result = await action(session);
-      await this.appendAction(session, type, result.success ? "ok" : "failed", {
+      await this.registry.appendAction(session, type, result.success ? "ok" : "failed", {
         ...details,
         mode: result.mode,
         success: result.success,
-        warnings: result.warnings
+        warnings: result.warnings,
       });
       return result;
     } catch (error) {
-      const safeError = secretValue
-        ? redactErrorMessage(error, secretValue)
-        : error;
-      await this.appendFailure(session, type, details, safeError);
+      const safeError = secretValue ? redactErrorMessage(error, secretValue) : error;
+      await this.registry.appendFailure(session, type, details, safeError);
       throw safeError;
     }
   }
@@ -2251,7 +2349,7 @@ export class SessionManager {
   private async openAppWithDecision(
     sessionId: SessionId,
     options: AppOpenOptions,
-    decision: DriverRouteDecision
+    decision: DriverRouteDecision,
   ): Promise<ManagedRoutedApp> {
     if (decision.selectedDriver === "browser-playwright") {
       if (!options.url) {
@@ -2263,7 +2361,7 @@ export class SessionManager {
         browserName: options.browserName,
         viewport: options.viewport,
         label: options.label,
-        timeoutMs: options.timeoutMs
+        timeoutMs: options.timeoutMs,
       });
       return {
         sessionId,
@@ -2275,7 +2373,7 @@ export class SessionManager {
         createdAt: page.createdAt,
         warnings: decision.warnings,
         underlyingId: page.pageId,
-        underlyingKind: "browser"
+        underlyingKind: "browser",
       };
     }
 
@@ -2289,12 +2387,12 @@ export class SessionManager {
         label: options.label,
         timeoutMs: options.timeoutMs,
         windowTitleIncludes: options.windowTitleIncludes,
-        applicationPath: options.appPath
+        applicationPath: options.appPath,
       });
       if (options.requireSemantic === true && app.mode !== "webdriver") {
         await this.closeTauriApp(sessionId, app.appId).catch(() => undefined);
         throw new ProcessError(
-          "openApp required semantic Tauri WebDriver mode, but the Tauri app opened in X11 fallback mode."
+          "openApp required semantic Tauri WebDriver mode, but the Tauri app opened in X11 fallback mode.",
         );
       }
       return {
@@ -2308,7 +2406,7 @@ export class SessionManager {
         processId: app.processId,
         warnings: [...decision.warnings, ...(app.warnings ?? [])],
         underlyingId: app.appId,
-        underlyingKind: "tauri"
+        underlyingKind: "tauri",
       };
     }
 
@@ -2323,12 +2421,12 @@ export class SessionManager {
         label: options.label,
         timeoutMs: options.timeoutMs,
         windowTitleIncludes: options.windowTitleIncludes,
-        excludeDevtools: options.excludeDevtools
+        excludeDevtools: options.excludeDevtools,
       });
       if (options.requireSemantic === true && app.mode !== "playwright-electron") {
         await this.closeElectronApp(sessionId, app.appId).catch(() => undefined);
         throw new ProcessError(
-          "openApp required semantic Electron mode, but the Electron app opened in X11 fallback mode."
+          "openApp required semantic Electron mode, but the Electron app opened in X11 fallback mode.",
         );
       }
       return {
@@ -2342,7 +2440,7 @@ export class SessionManager {
         processId: app.processId,
         warnings: [...decision.warnings, ...(app.warnings ?? [])],
         underlyingId: app.appId,
-        underlyingKind: "electron"
+        underlyingKind: "electron",
       };
     }
 
@@ -2351,7 +2449,7 @@ export class SessionManager {
       command,
       args: options.args ?? [],
       cwd: options.cwd,
-      env: options.env
+      env: options.env,
     });
     return {
       sessionId,
@@ -2363,7 +2461,7 @@ export class SessionManager {
       createdAt: launch.startedAt.toISOString(),
       processId: launch.processId,
       warnings: decision.warnings,
-      underlyingKind: "x11"
+      underlyingKind: "x11",
     };
   }
 
@@ -2407,7 +2505,7 @@ export class SessionManager {
   private resolveActionDriver(
     app: ManagedRoutedApp,
     preferredDriver: RoutedDriverKind | undefined,
-    allowFallback = true
+    allowFallback = true,
   ): RoutedDriverKind {
     if (!preferredDriver || preferredDriver === app.selectedDriver) {
       return app.selectedDriver;
@@ -2416,7 +2514,7 @@ export class SessionManager {
       return "x11-fallback";
     }
     throw new ProcessError(
-      `App ${app.appId} was opened with ${app.selectedDriver}; cannot use preferred driver ${preferredDriver}.`
+      `App ${app.appId} was opened with ${app.selectedDriver}; cannot use preferred driver ${preferredDriver}.`,
     );
   }
 
@@ -2426,7 +2524,7 @@ export class SessionManager {
     actionType: string,
     success: boolean,
     details: Readonly<Record<string, unknown>> | undefined = undefined,
-    warnings: readonly string[] | undefined = undefined
+    warnings: readonly string[] | undefined = undefined,
   ): Promise<AppActionResult> {
     const result: AppActionResult = {
       sessionId: app.sessionId,
@@ -2439,18 +2537,23 @@ export class SessionManager {
       success,
       createdAt: isoNow(),
       warnings: warnings ?? app.warnings,
-      details
+      details,
     };
-    const session = this.requireManagedSession(app.sessionId).session;
-    await this.appendAction(session, actionType as ActionLogRecord["type"], success ? "ok" : "failed", {
-      appId: result.appId,
-      appKind: result.appKind,
-      selectedDriver: result.selectedDriver,
-      semantic: result.semantic,
-      fallbackUsed: result.fallbackUsed,
-      warnings: result.warnings,
-      details: result.details
-    });
+    const session = this.registry.requireManagedSession(app.sessionId).session;
+    await this.registry.appendAction(
+      session,
+      actionType as ActionLogRecord["type"],
+      success ? "ok" : "failed",
+      {
+        appId: result.appId,
+        appKind: result.appKind,
+        selectedDriver: result.selectedDriver,
+        semantic: result.semantic,
+        fallbackUsed: result.fallbackUsed,
+        warnings: result.warnings,
+        details: result.details,
+      },
+    );
     return result;
   }
 
@@ -2458,17 +2561,24 @@ export class SessionManager {
     app: ManagedRoutedApp,
     selectedDriver: RoutedDriverKind,
     actionType: string,
-    reason: string
+    reason: string,
   ): Promise<AppActionResult> {
-    return await this.appResult(app, selectedDriver, actionType, false, {
-      unsupported: true,
-      reason
-    }, [...app.warnings, reason]);
+    return await this.appResult(
+      app,
+      selectedDriver,
+      actionType,
+      false,
+      {
+        unsupported: true,
+        reason,
+      },
+      [...app.warnings, reason],
+    );
   }
 
   private async closeRoutedAppResources(
     sessionId: SessionId,
-    session: DesktopSession
+    session: DesktopSession,
   ): Promise<void> {
     const appIds = [...(this.routedAppsBySession.get(sessionId) ?? [])];
     const errors: string[] = [];
@@ -2503,22 +2613,25 @@ export class SessionManager {
     },
     actionTypeOverride?: Extract<ActionLogRecord["type"], `visual.${string}`>,
     resultKindOverride?: VisualAssertionKind,
-    extraResult: Partial<VisualCompareResult> = {}
+    extraResult: Partial<VisualCompareResult> = {},
   ): Promise<VisualCompareResult> {
-    const managed = this.requireManagedSession(sessionId);
+    const managed = this.registry.requireManagedSession(sessionId);
     const session = managed.session;
-    this.ensureRunning(session);
+    this.registry.ensureRunning(session);
 
-    const actionType = actionTypeOverride ?? (kind === "assert-changed"
-      ? "visual.assert_changed"
-      : kind === "assert-similar"
-        ? "visual.assert_similar"
-        : "visual.compare");
-    const beforePath = this.evidenceStore.resolveEvidencePath(session, options.beforePath);
-    const afterPath = this.evidenceStore.resolveEvidencePath(session, options.afterPath);
-    const diffPath = options.createDiffImage === true
-      ? await this.evidenceStore.getNextVisualDiffPath(session, options.label ?? kind)
-      : undefined;
+    const actionType =
+      actionTypeOverride ??
+      (kind === "assert-changed"
+        ? "visual.assert_changed"
+        : kind === "assert-similar"
+          ? "visual.assert_similar"
+          : "visual.compare");
+    const beforePath = this.registry.evidenceStore.resolveEvidencePath(session, options.beforePath);
+    const afterPath = this.registry.evidenceStore.resolveEvidencePath(session, options.afterPath);
+    const diffPath =
+      options.createDiffImage === true
+        ? await this.registry.evidenceStore.getNextVisualDiffPath(session, options.label ?? kind)
+        : undefined;
 
     try {
       const comparison = await this.visualQaService.compare({
@@ -2529,7 +2642,7 @@ export class SessionManager {
         region: options.region,
         threshold: options.threshold,
         minDiffPixelRatio: options.minDiffPixelRatio,
-        maxDiffPixelRatio: options.maxDiffPixelRatio
+        maxDiffPixelRatio: options.maxDiffPixelRatio,
       });
       const result: VisualCompareResult = {
         sessionId,
@@ -2550,23 +2663,28 @@ export class SessionManager {
         maxDiffPixelRatio: comparison.maxDiffPixelRatio,
         passed: comparison.passed,
         createdAt: isoNow(),
-        warnings: comparison.warnings
+        warnings: comparison.warnings,
       };
 
       await this.recordVisualResult(session, actionType, result);
       return result;
     } catch (error) {
-      await this.appendFailure(session, actionType, {
-        label: options.label,
-        kind,
-        beforePath: options.beforePath,
-        afterPath: options.afterPath,
-        region: options.region,
-        threshold: options.threshold,
-        minDiffPixelRatio: options.minDiffPixelRatio,
-        maxDiffPixelRatio: options.maxDiffPixelRatio,
-        createDiffImage: options.createDiffImage === true
-      }, error);
+      await this.registry.appendFailure(
+        session,
+        actionType,
+        {
+          label: options.label,
+          kind,
+          beforePath: options.beforePath,
+          afterPath: options.afterPath,
+          region: options.region,
+          threshold: options.threshold,
+          minDiffPixelRatio: options.minDiffPixelRatio,
+          maxDiffPixelRatio: options.maxDiffPixelRatio,
+          createDiffImage: options.createDiffImage === true,
+        },
+        error,
+      );
       throw error;
     }
   }
@@ -2574,46 +2692,51 @@ export class SessionManager {
   private async recordVisualResult(
     session: DesktopSession,
     actionType: Extract<ActionLogRecord["type"], `visual.${string}`>,
-    result: VisualCompareResult
+    result: VisualCompareResult,
   ): Promise<void> {
-    await this.evidenceStore.appendVisualAssertion(session, result);
-    await this.appendAction(session, actionType, result.passed === false ? "failed" : "ok", {
-      label: result.label,
-      kind: result.kind,
-      baselineName: result.baselineName,
-      baselineSuite: result.baselineSuite,
-      annotationId: result.annotationId,
-      beforePath: this.evidenceStore.toEvidenceRelativePath(session, result.beforePath),
-      afterPath: this.evidenceStore.toEvidenceRelativePath(session, result.afterPath),
-      diffPath: result.diffPath
-        ? this.evidenceStore.toEvidenceRelativePath(session, result.diffPath)
-        : undefined,
-      region: result.region,
-      allowedRegions: result.allowedRegions,
-      width: result.width,
-      height: result.height,
-      comparedPixels: result.comparedPixels,
-      diffPixels: result.diffPixels,
-      diffPixelRatio: result.diffPixelRatio,
-      threshold: result.threshold,
-      minDiffPixelRatio: result.minDiffPixelRatio,
-      maxDiffPixelRatio: result.maxDiffPixelRatio,
-      maxOutsideDiffPixelRatio: result.maxOutsideDiffPixelRatio,
-      minInsideDiffPixelRatio: result.minInsideDiffPixelRatio,
-      insideDiffPixelRatio: result.insideDiffPixelRatio,
-      outsideDiffPixelRatio: result.outsideDiffPixelRatio,
-      containmentPassed: result.containmentPassed,
-      passed: result.passed,
-      warnings: result.warnings
-    });
+    await this.registry.evidenceStore.appendVisualAssertion(session, result);
+    await this.registry.appendAction(
+      session,
+      actionType,
+      result.passed === false ? "failed" : "ok",
+      {
+        label: result.label,
+        kind: result.kind,
+        baselineName: result.baselineName,
+        baselineSuite: result.baselineSuite,
+        annotationId: result.annotationId,
+        beforePath: this.registry.evidenceStore.toEvidenceRelativePath(session, result.beforePath),
+        afterPath: this.registry.evidenceStore.toEvidenceRelativePath(session, result.afterPath),
+        diffPath: result.diffPath
+          ? this.registry.evidenceStore.toEvidenceRelativePath(session, result.diffPath)
+          : undefined,
+        region: result.region,
+        allowedRegions: result.allowedRegions,
+        width: result.width,
+        height: result.height,
+        comparedPixels: result.comparedPixels,
+        diffPixels: result.diffPixels,
+        diffPixelRatio: result.diffPixelRatio,
+        threshold: result.threshold,
+        minDiffPixelRatio: result.minDiffPixelRatio,
+        maxDiffPixelRatio: result.maxDiffPixelRatio,
+        maxOutsideDiffPixelRatio: result.maxOutsideDiffPixelRatio,
+        minInsideDiffPixelRatio: result.minInsideDiffPixelRatio,
+        insideDiffPixelRatio: result.insideDiffPixelRatio,
+        outsideDiffPixelRatio: result.outsideDiffPixelRatio,
+        containmentPassed: result.containmentPassed,
+        passed: result.passed,
+        warnings: result.warnings,
+      },
+    );
   }
 
   private async resolveAnnotationRegion(
     session: DesktopSession,
-    options: AnnotationRegionOptions
+    options: AnnotationRegionOptions,
   ): Promise<AnnotationRegionResult> {
-    const annotation = (await this.evidenceStore.listAnnotations(session)).find(
-      (item) => item.id === options.annotationId
+    const annotation = (await this.registry.evidenceStore.listAnnotations(session)).find(
+      (item) => item.id === options.annotationId,
     );
     if (!annotation) {
       throw new ProcessError(`Annotation not found: ${options.annotationId}`);
@@ -2630,22 +2753,26 @@ export class SessionManager {
       throw new ProcessError("Annotation region padding must be a non-negative finite number.");
     }
     const size = await readPngSize(annotation.screenshotPath);
-    const region = clampImageRegion({
-      x: annotation.x - padding,
-      y: annotation.y - padding,
-      width: annotation.width + padding * 2,
-      height: annotation.height + padding * 2
-    }, size.width, size.height);
+    const region = clampImageRegion(
+      {
+        x: annotation.x - padding,
+        y: annotation.y - padding,
+        width: annotation.width + padding * 2,
+        height: annotation.height + padding * 2,
+      },
+      size.width,
+      size.height,
+    );
     return {
       annotationId: annotation.id,
       region,
       screenshotPath: annotation.screenshotPath,
-      note: annotation.note
+      note: annotation.note,
     };
   }
 
   private requireManagedSession(sessionId: SessionId): ManagedSession {
-    const managed = this.sessions.get(sessionId);
+    const managed = this.registry.sessions.get(sessionId);
     if (!managed) {
       throw new SessionNotFoundError(sessionId);
     }
@@ -2654,11 +2781,11 @@ export class SessionManager {
 
   private updateManagedSession(
     managed: ManagedSession,
-    patch: Partial<DesktopSession>
+    patch: Partial<DesktopSession>,
   ): DesktopSession {
     managed.session = {
       ...managed.session,
-      ...patch
+      ...patch,
     };
     return managed.session;
   }
@@ -2674,15 +2801,15 @@ export class SessionManager {
     type: ActionLogRecord["type"],
     status: ActionLogRecord["status"],
     details?: Readonly<Record<string, unknown>>,
-    error?: unknown
+    error?: unknown,
   ): Promise<void> {
-    await this.evidenceStore.appendAction(session, {
+    await this.registry.evidenceStore.appendAction(session, {
       timestamp: isoNow(),
       sessionId: session.id,
       type,
       status,
       details,
-      errorMessage: error instanceof Error ? error.message : undefined
+      errorMessage: error instanceof Error ? error.message : undefined,
     });
   }
 
@@ -2690,13 +2817,19 @@ export class SessionManager {
     session: DesktopSession,
     type: ActionLogRecord["type"],
     details: Readonly<Record<string, unknown>>,
-    error: unknown
+    error: unknown,
   ): Promise<void> {
-    await this.appendAction(session, type, "failed", details, error);
-    await this.appendAction(session, "error", "failed", {
-      phase: type,
-      ...details
-    }, error);
+    await this.registry.appendAction(session, type, "failed", details, error);
+    await this.registry.appendAction(
+      session,
+      "error",
+      "failed",
+      {
+        phase: type,
+        ...details,
+      },
+      error,
+    );
   }
 }
 
@@ -2707,13 +2840,13 @@ export interface ScreenshotFingerprint {
 
 async function fingerprintScreenshot(
   path: string,
-  mode: NonNullable<WaitForStableScreenOptions["mode"]>
+  mode: NonNullable<WaitForStableScreenOptions["mode"]>,
 ): Promise<ScreenshotFingerprint> {
   const size = await fileSize(path);
   return mode === "hash"
     ? {
         size,
-        hash: await hashFile(path)
+        hash: await hashFile(path),
       }
     : { size };
 }
@@ -2722,7 +2855,7 @@ export function fingerprintsMatch(
   left: ScreenshotFingerprint,
   right: ScreenshotFingerprint,
   mode: NonNullable<WaitForStableScreenOptions["mode"]> = "hash",
-  fileSizeToleranceBytes = 0
+  fileSizeToleranceBytes = 0,
 ): boolean {
   if (mode === "tolerant") {
     return Math.abs(left.size - right.size) <= fileSizeToleranceBytes;
@@ -2739,7 +2872,7 @@ async function applyStableScreenshotRetention(
   evidenceStore: EvidenceStore,
   session: DesktopSession,
   retainedScreenshots: ScreenshotResult[],
-  maxRetainedScreenshots: number | undefined
+  maxRetainedScreenshots: number | undefined,
 ): Promise<number> {
   if (maxRetainedScreenshots === undefined) {
     return 0;
@@ -2759,7 +2892,7 @@ async function applyStableScreenshotRetention(
 }
 
 function stableScreenActionDetails(
-  result: WaitForStableScreenResult
+  result: WaitForStableScreenResult,
 ): Readonly<Record<string, unknown>> {
   return {
     stable: result.stable,
@@ -2769,7 +2902,7 @@ function stableScreenActionDetails(
     retainedScreenshots: result.retainedScreenshots?.map((screenshot) => screenshot.path),
     discardedScreenshotCount: result.discardedScreenshotCount,
     lastScreenshot: result.lastScreenshot?.path,
-    reason: result.reason
+    reason: result.reason,
   };
 }
 
@@ -2783,7 +2916,7 @@ function toAppRef(app: ManagedRoutedApp): AppRef {
     fallbackUsed: app.fallbackUsed,
     createdAt: app.createdAt,
     processId: app.processId,
-    warnings: app.warnings
+    warnings: app.warnings,
   };
 }
 
@@ -2803,7 +2936,7 @@ function semanticTargetForApp(
     label?: string;
     placeholder?: string;
     testId?: string;
-  }>
+  }>,
 ): {
   readonly selector?: string;
   readonly text?: string;
@@ -2827,7 +2960,7 @@ function semanticTargetForApp(
     name: options.name,
     label: hasTargetOtherThanLabel ? undefined : options.label,
     placeholder: options.placeholder,
-    testId: options.testId
+    testId: options.testId,
   };
 }
 
@@ -2840,7 +2973,7 @@ function browserTargetDetails(
     label?: string;
     placeholder?: string;
     testId?: string;
-  }>
+  }>,
 ): Readonly<Record<string, unknown>> {
   return {
     selector: target.selector,
@@ -2849,7 +2982,7 @@ function browserTargetDetails(
     name: target.name,
     targetLabel: target.label,
     placeholder: target.placeholder,
-    testId: target.testId
+    testId: target.testId,
   };
 }
 

@@ -1,14 +1,14 @@
-import { randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { createServer } from "node:net";
-import type { DesktopSession, SessionId } from "../types.js";
 import { ProcessError } from "../errors.js";
-import { createSanitizedEnvironment, waitForSpawn } from "../utils/command.js";
 import { terminateProcessTree } from "../session/processTree.js";
+import type { DesktopSession, SessionId } from "../types.js";
+import { createSanitizedEnvironment, waitForSpawn } from "../utils/command.js";
 import { isoNow } from "../utils/time.js";
 import { getLiveObserverStatus } from "./observerStatus.js";
 import type {
@@ -16,7 +16,7 @@ import type {
   LiveObserverStatus,
   ManagedLiveObserver,
   StartLiveObserverOptions,
-  StopLiveObserverResult
+  StopLiveObserverResult,
 } from "./observerTypes.js";
 
 export interface NoVncObserverOptions {
@@ -55,7 +55,7 @@ export class NoVncObserver {
 
   async start(
     session: DesktopSession,
-    options: StartLiveObserverOptions = {}
+    options: StartLiveObserverOptions = {},
   ): Promise<LiveObserverRef> {
     const host = normalizeObserverHost(options.host);
     const viewOnly = options.viewOnly ?? true;
@@ -66,8 +66,8 @@ export class NoVncObserver {
         [
           "Live observer dependencies are unavailable.",
           ...status.errors,
-          ...status.installHints.map((hint) => `Install hint: ${hint}`)
-        ].join(" ")
+          ...status.installHints.map((hint) => `Install hint: ${hint}`),
+        ].join(" "),
       );
     }
 
@@ -85,17 +85,17 @@ export class NoVncObserver {
       display: session.display,
       vncPort,
       viewOnly,
-      passwordFilePath
+      passwordFilePath,
     });
     const x11vncCommand = status.x11vncPath ?? "x11vnc";
     const x11vncProcess = spawn(x11vncCommand, x11vncArgs, {
       detached: true,
       env: createSanitizedEnvironment({
         DISPLAY: session.display,
-        AGENT_DESKTOP_HARNESS_SESSION_ID: session.id
+        AGENT_DESKTOP_HARNESS_SESSION_ID: session.id,
       }),
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
     try {
@@ -112,7 +112,7 @@ export class NoVncObserver {
     const proxy = status.novncProxyPath
       ? {
           command: status.novncProxyPath,
-          args: buildNoVncProxyArgs({ host, webPort, vncPort })
+          args: buildNoVncProxyArgs({ host, webPort, vncPort }),
         }
       : {
           command: status.websockifyPath ?? "websockify",
@@ -120,18 +120,18 @@ export class NoVncObserver {
             host,
             webPort,
             vncPort,
-            noVncWebRootPath: requireNoVncWebRoot(status)
-          })
+            noVncWebRootPath: requireNoVncWebRoot(status),
+          }),
         };
 
     const proxyProcess = spawn(proxy.command, proxy.args, {
       detached: true,
       env: createSanitizedEnvironment({
         DISPLAY: session.display,
-        AGENT_DESKTOP_HARNESS_SESSION_ID: session.id
+        AGENT_DESKTOP_HARNESS_SESSION_ID: session.id,
       }),
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
     try {
@@ -161,7 +161,7 @@ export class NoVncObserver {
       proxyProcess,
       passwordFilePath,
       x11vncCommand: [x11vncCommand, ...redactPasswordFileArg(x11vncArgs)],
-      proxyCommand: [proxy.command, ...proxy.args]
+      proxyCommand: [proxy.command, ...proxy.args],
     };
 
     this.remember(observer);
@@ -180,17 +180,14 @@ export class NoVncObserver {
       .map(toObserverRef);
   }
 
-  async stop(
-    sessionId: SessionId,
-    observerId?: string
-  ): Promise<StopLiveObserverResult> {
+  async stop(sessionId: SessionId, observerId?: string): Promise<StopLiveObserverResult> {
     const observer = this.resolveObserver(sessionId, observerId);
     if (!observer) {
       const resolvedObserverId = observerId ?? "";
       return {
         sessionId,
         observerId: resolvedObserverId,
-        stopped: false
+        stopped: false,
       };
     }
 
@@ -204,14 +201,12 @@ export class NoVncObserver {
     return {
       sessionId,
       observerId: observer.observerId,
-      stopped: true
+      stopped: true,
     };
   }
 
   async stopAll(sessionId?: SessionId): Promise<void> {
-    const observers = sessionId
-      ? this.list(sessionId)
-      : this.list();
+    const observers = sessionId ? this.list(sessionId) : this.list();
 
     for (const observer of observers) {
       await this.stop(observer.sessionId, observer.observerId);
@@ -236,7 +231,7 @@ export class NoVncObserver {
 
   private resolveObserver(
     sessionId: SessionId,
-    observerId?: string
+    observerId?: string,
   ): ManagedLiveObserver | undefined {
     if (observerId) {
       const observer = this.observers.get(observerId);
@@ -258,7 +253,7 @@ export function buildX11VncArgs(options: X11VncCommandOptions): string[] {
     "-localhost",
     "-forever",
     "-shared",
-    "-quiet"
+    "-quiet",
   ];
 
   if (options.viewOnly) {
@@ -279,7 +274,7 @@ export function buildNoVncProxyArgs(options: NoVncProxyCommandOptions): string[]
     "--listen",
     `${options.host}:${options.webPort}`,
     "--vnc",
-    `${options.host}:${options.vncPort}`
+    `${options.host}:${options.vncPort}`,
   ];
 }
 
@@ -288,14 +283,14 @@ export function buildWebsockifyArgs(options: WebsockifyCommandOptions): string[]
     "--web",
     options.noVncWebRootPath,
     `${options.host}:${options.webPort}`,
-    `${options.host}:${options.vncPort}`
+    `${options.host}:${options.vncPort}`,
   ];
 }
 
 export function normalizeObserverHost(host = "127.0.0.1"): string {
   if (host !== "127.0.0.1") {
     throw new ProcessError(
-      "Live observer is local-only in this MVP. Use host 127.0.0.1 and an SSH tunnel for remote viewing."
+      "Live observer is local-only in this MVP. Use host 127.0.0.1 and an SSH tunnel for remote viewing.",
     );
   }
 
@@ -313,7 +308,7 @@ export function makeNoVncUrl(host: string, webPort: number, viewOnly: boolean): 
 }
 
 export function redactObserverStartDetails(
-  options: StartLiveObserverOptions
+  options: StartLiveObserverOptions,
 ): Record<string, unknown> {
   return {
     host: options.host ?? "127.0.0.1",
@@ -321,14 +316,14 @@ export function redactObserverStartDetails(
     webPort: options.webPort,
     viewOnly: options.viewOnly ?? true,
     passwordProvided: options.password !== undefined,
-    label: options.label
+    label: options.label,
   };
 }
 
 async function resolvePort(
   host: string,
   port: number | undefined,
-  portAllocator: (host: string) => Promise<number>
+  portAllocator: (host: string) => Promise<number>,
 ): Promise<number> {
   if (port === undefined) {
     return await portAllocator(host);
@@ -386,11 +381,11 @@ async function removeObserverPasswordFile(path: string): Promise<void> {
 async function assertStillRunning(
   child: ChildProcess,
   command: string,
-  delayMs = 350
+  delayMs = 350,
 ): Promise<void> {
   if (child.exitCode !== null || child.signalCode !== null) {
     throw new ProcessError(
-      `${command} exited immediately (code=${String(child.exitCode)}, signal=${String(child.signalCode)}).`
+      `${command} exited immediately (code=${String(child.exitCode)}, signal=${String(child.signalCode)}).`,
     );
   }
 
@@ -404,8 +399,8 @@ async function assertStillRunning(
       clearTimeout(timeout);
       reject(
         new ProcessError(
-          `${command} exited during startup (code=${String(code)}, signal=${String(signal)}).`
-        )
+          `${command} exited during startup (code=${String(code)}, signal=${String(signal)}).`,
+        ),
       );
     };
 
@@ -439,6 +434,6 @@ function toObserverRef(observer: ManagedLiveObserver): LiveObserverRef {
     viewOnly: observer.viewOnly,
     url: observer.url,
     createdAt: observer.createdAt,
-    warnings: observer.warnings
+    warnings: observer.warnings,
   };
 }

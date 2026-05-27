@@ -4,10 +4,10 @@ import type {
   HotkeyAction,
   InputActionResult,
   ScrollAction,
-  TypeTextAction
+  TypeTextAction,
 } from "../types.js";
-import { XdotoolInputBackend } from "./XdotoolInputBackend.js";
 import type { InputBackend } from "./types.js";
+import { XdotoolInputBackend } from "./XdotoolInputBackend.js";
 
 export interface InputServiceOptions {
   readonly backend?: InputBackend;
@@ -24,17 +24,11 @@ export class InputService implements InputBackend {
     return await this.backend.click(session, action);
   }
 
-  async doubleClick(
-    session: DesktopSession,
-    action: ClickAction
-  ): Promise<InputActionResult> {
+  async doubleClick(session: DesktopSession, action: ClickAction): Promise<InputActionResult> {
     return await this.backend.doubleClick(session, action);
   }
 
-  async typeText(
-    session: DesktopSession,
-    action: TypeTextAction
-  ): Promise<InputActionResult> {
+  async typeText(session: DesktopSession, action: TypeTextAction): Promise<InputActionResult> {
     return await this.backend.typeText(session, action);
   }
 

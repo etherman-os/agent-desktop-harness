@@ -1,14 +1,10 @@
 import type { WindowFilter, WindowInfo } from "../types.js";
 
-const DEVTOOLS_TITLE_PATTERNS = [
-  "DevTools",
-  "Developer Tools",
-  "Inspect"
-] as const;
+const DEVTOOLS_TITLE_PATTERNS = ["DevTools", "Developer Tools", "Inspect"] as const;
 
 export function filterWindows(
   windows: readonly WindowInfo[],
-  filter: WindowFilter = {}
+  filter: WindowFilter = {},
 ): WindowInfo[] {
   const titleIncludes = filter.titleIncludes?.toLowerCase();
   const titleExcludes = (filter.titleExcludes ?? []).map((value) => value.toLowerCase());
@@ -42,7 +38,7 @@ export function filterWindows(
 
 export function findBestWindow(
   windows: readonly WindowInfo[],
-  filter: WindowFilter = {}
+  filter: WindowFilter = {},
 ): WindowInfo | undefined {
   return filterWindows(windows, filter)[0];
 }

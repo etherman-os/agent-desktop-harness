@@ -3,15 +3,13 @@ import { join } from "node:path";
 import { findExecutableOnPath } from "../utils/command.js";
 import type { LiveObserverStatus, ObserverDependencyPaths } from "./observerTypes.js";
 
-const OBSERVER_INSTALL_HINTS = [
-  "sudo apt install -y x11vnc novnc websockify"
-] as const;
+const OBSERVER_INSTALL_HINTS = ["sudo apt install -y x11vnc novnc websockify"] as const;
 
 const DEFAULT_NOVNC_WEB_ROOT_CANDIDATES = [
   "/usr/share/novnc",
   "/usr/share/noVNC",
   "/usr/local/share/novnc",
-  "/usr/share/webapps/novnc"
+  "/usr/share/webapps/novnc",
 ] as const;
 
 export interface LiveObserverStatusOptions {
@@ -19,7 +17,7 @@ export interface LiveObserverStatusOptions {
   readonly noVncWebRootCandidates?: readonly string[];
 }
 export async function getLiveObserverStatus(
-  options: LiveObserverStatusOptions = {}
+  options: LiveObserverStatusOptions = {},
 ): Promise<LiveObserverStatus> {
   const env = options.env ?? process.env;
   const paths = await findObserverDependencyPaths(options);
@@ -45,7 +43,7 @@ export async function getLiveObserverStatus(
   const explicitWebRoot = env.AGENT_DESKTOP_HARNESS_NOVNC_WEB_ROOT;
   if (explicitWebRoot && !paths.noVncWebRootPath) {
     warnings.push(
-      `AGENT_DESKTOP_HARNESS_NOVNC_WEB_ROOT is set but does not contain vnc.html: ${explicitWebRoot}`
+      `AGENT_DESKTOP_HARNESS_NOVNC_WEB_ROOT is set but does not contain vnc.html: ${explicitWebRoot}`,
     );
   }
 
@@ -58,30 +56,28 @@ export async function getLiveObserverStatus(
     noVncWebRootPath: paths.noVncWebRootPath,
     warnings,
     errors,
-    installHints: OBSERVER_INSTALL_HINTS
+    installHints: OBSERVER_INSTALL_HINTS,
   };
 }
 
 export async function findObserverDependencyPaths(
-  options: LiveObserverStatusOptions = {}
+  options: LiveObserverStatusOptions = {},
 ): Promise<ObserverDependencyPaths> {
   const env = options.env ?? process.env;
   const candidates = [
     env.AGENT_DESKTOP_HARNESS_NOVNC_WEB_ROOT,
-    ...(options.noVncWebRootCandidates ?? DEFAULT_NOVNC_WEB_ROOT_CANDIDATES)
+    ...(options.noVncWebRootCandidates ?? DEFAULT_NOVNC_WEB_ROOT_CANDIDATES),
   ].filter((candidate): candidate is string => candidate !== undefined && candidate.length > 0);
 
   return {
     x11vncPath: await findExecutableOnPath("x11vnc", env),
     websockifyPath: await findExecutableOnPath("websockify", env),
     novncProxyPath: await findExecutableOnPath("novnc_proxy", env),
-    noVncWebRootPath: await findNoVncWebRoot(candidates)
+    noVncWebRootPath: await findNoVncWebRoot(candidates),
   };
 }
 
-export async function findNoVncWebRoot(
-  candidates: readonly string[]
-): Promise<string | undefined> {
+export async function findNoVncWebRoot(candidates: readonly string[]): Promise<string | undefined> {
   for (const candidate of candidates) {
     try {
       await access(join(candidate, "vnc.html"));

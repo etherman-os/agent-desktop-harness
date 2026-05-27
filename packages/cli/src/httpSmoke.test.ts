@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  httpJsonRequest,
-  parseSmokeHttpArgs,
-  type FetchLike
-} from "./httpSmoke.js";
+import { type FetchLike, httpJsonRequest, parseSmokeHttpArgs } from "./httpSmoke.js";
 
 test("parseSmokeHttpArgs uses the local HTTP smoke defaults", () => {
   const parsed = parseSmokeHttpArgs([]);
@@ -15,10 +11,7 @@ test("parseSmokeHttpArgs uses the local HTTP smoke defaults", () => {
 });
 
 test("parseSmokeHttpArgs validates port values", () => {
-  assert.throws(
-    () => parseSmokeHttpArgs(["--port", "70000"]),
-    /Invalid port/
-  );
+  assert.throws(() => parseSmokeHttpArgs(["--port", "70000"]), /Invalid port/);
 });
 
 test("httpJsonRequest sends JSON bodies and parses successful responses", async () => {
@@ -30,7 +23,7 @@ test("httpJsonRequest sends JSON bodies and parses successful responses", async 
       status: 200,
       async text() {
         return JSON.stringify({ ok: true });
-      }
+      },
     };
   };
 
@@ -39,8 +32,8 @@ test("httpJsonRequest sends JSON bodies and parses successful responses", async 
     "http://127.0.0.1:7352/example",
     {
       method: "POST",
-      body: { value: "test" }
-    }
+      body: { value: "test" },
+    },
   );
 
   assert.deepEqual(result, { ok: true });
@@ -56,14 +49,14 @@ test("httpJsonRequest surfaces structured HTTP error messages", async () => {
         ok: false,
         error: {
           code: "MISSING_DEPENDENCY",
-          message: "Missing dependency: Xvfb"
-        }
+          message: "Missing dependency: Xvfb",
+        },
       });
-    }
+    },
   });
 
   await assert.rejects(
     async () => await httpJsonRequest(fetchLike, "http://127.0.0.1:7352/example"),
-    /HTTP 503: Missing dependency: Xvfb/
+    /HTTP 503: Missing dependency: Xvfb/,
   );
 });

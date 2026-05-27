@@ -1,13 +1,11 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { DisplayAllocator } from "./displayAllocator.js";
-import { SessionManager } from "./SessionManager.js";
-import { InputService } from "../input/InputService.js";
+import { join } from "node:path";
+import test from "node:test";
 import type { XvfbDisplayOptions } from "../display/XvfbDisplay.js";
+import { InputService } from "../input/InputService.js";
 import type { InputBackend } from "../input/types.js";
 import type {
   ClickAction,
@@ -15,29 +13,25 @@ import type {
   HotkeyAction,
   InputActionResult,
   ScrollAction,
-  TypeTextAction
+  TypeTextAction,
 } from "../types.js";
 import { isoNow } from "../utils/time.js";
+import { DisplayAllocator } from "./displayAllocator.js";
+import { SessionManager } from "./SessionManager.js";
 
 class MockInputBackend implements InputBackend {
   async click(session: DesktopSession, action: ClickAction): Promise<InputActionResult> {
     return makeResult(session, "input.click", { ...action });
   }
 
-  async doubleClick(
-    session: DesktopSession,
-    action: ClickAction
-  ): Promise<InputActionResult> {
+  async doubleClick(session: DesktopSession, action: ClickAction): Promise<InputActionResult> {
     return makeResult(session, "input.double_click", { ...action });
   }
 
-  async typeText(
-    session: DesktopSession,
-    action: TypeTextAction
-  ): Promise<InputActionResult> {
+  async typeText(session: DesktopSession, action: TypeTextAction): Promise<InputActionResult> {
     return makeResult(session, "input.type_text", {
       text: action.text,
-      unsafeBackendDetail: true
+      unsafeBackendDetail: true,
     });
   }
 
@@ -56,7 +50,7 @@ test("SessionManager redacts secret typeText action logs", async () => {
     displayAllocator: new DisplayAllocator({
       min: 190,
       max: 190,
-      isDisplayInUse: () => false
+      isDisplayInUse: () => false,
     }),
     displayBackend: {
       start: async ({ display, width, height, depth }: XvfbDisplayOptions) => ({
@@ -65,23 +59,23 @@ test("SessionManager redacts secret typeText action logs", async () => {
         height,
         depth,
         xvfbProcess: { pid: 1000 } as ChildProcess,
-        warnings: []
-      })
+        warnings: [],
+      }),
     } as never,
     inputService: new InputService({
-      backend: new MockInputBackend()
-    })
+      backend: new MockInputBackend(),
+    }),
   });
 
   try {
     const session = await manager.createSession({
-      workspacePath
+      workspacePath,
     });
 
     await manager.typeText(session.id, {
       text: "super-secret",
       secret: true,
-      label: "password"
+      label: "password",
     });
 
     const actionsPath = join(session.evidencePath, "actions.jsonl");
@@ -100,13 +94,13 @@ test("SessionManager redacts secret typeText action logs", async () => {
 function makeResult(
   session: DesktopSession,
   actionType: string,
-  details: Readonly<Record<string, unknown>>
+  details: Readonly<Record<string, unknown>>,
 ): InputActionResult {
   return {
     sessionId: session.id,
     actionType,
     createdAt: isoNow(),
     success: true,
-    details
+    details,
   };
 }

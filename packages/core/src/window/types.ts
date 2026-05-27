@@ -2,13 +2,10 @@ import type {
   DesktopSession,
   FocusWindowTarget,
   WindowActionResult,
-  WindowInfo
+  WindowInfo,
 } from "../types.js";
 
 export interface WindowBackend {
   getWindows(session: DesktopSession): Promise<WindowInfo[]>;
-  focusWindow(
-    session: DesktopSession,
-    target: FocusWindowTarget
-  ): Promise<WindowActionResult>;
+  focusWindow(session: DesktopSession, target: FocusWindowTarget): Promise<WindowActionResult>;
 }

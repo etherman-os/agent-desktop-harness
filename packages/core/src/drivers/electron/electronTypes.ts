@@ -1,8 +1,4 @@
-import type {
-  DesktopSession,
-  ScreenshotResult,
-  SessionId
-} from "../../types.js";
+import type { DesktopSession, ScreenshotResult, SessionId } from "../../types.js";
 
 export type ElectronDriverMode = "playwright-electron" | "x11-fallback";
 
@@ -100,13 +96,13 @@ export interface ElectronDriver {
   press(session: DesktopSession, options: ElectronPressOptions): Promise<ElectronActionResult>;
   assertText(
     session: DesktopSession,
-    options: ElectronAssertTextOptions
+    options: ElectronAssertTextOptions,
   ): Promise<ElectronActionResult>;
   screenshot(
     session: DesktopSession,
     filePath: string,
     sequence: number,
-    options: ElectronScreenshotOptions
+    options: ElectronScreenshotOptions,
   ): Promise<ScreenshotResult | undefined>;
   close(session: DesktopSession, appId?: string): Promise<void>;
   closeAll(sessionId: SessionId): Promise<void>;

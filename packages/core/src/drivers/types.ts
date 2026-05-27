@@ -1,9 +1,4 @@
-import type {
-  DesktopSession,
-  DriverKind,
-  InputAction,
-  ScreenshotResult
-} from "../types.js";
+import type { DesktopSession, DriverKind, InputAction, ScreenshotResult } from "../types.js";
 
 export interface DriverProbeResult {
   readonly kind: DriverKind;

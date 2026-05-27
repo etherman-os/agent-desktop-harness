@@ -1,13 +1,25 @@
-import { randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { basename, resolve } from "node:path";
+import { _electron, type ElectronApplication, type Locator, type Page } from "playwright-core";
+import { ProcessError } from "../../errors.js";
+import { terminateProcessTree } from "../../session/processTree.js";
+import type { DesktopSession, ScreenshotResult, SessionId } from "../../types.js";
 import {
-  _electron,
-  type ElectronApplication,
-  type Locator,
-  type Page
-} from "playwright-core";
+  createSanitizedEnvironment,
+  findExecutableOnPath,
+  waitForSpawn,
+} from "../../utils/command.js";
+import { fileSize } from "../../utils/fs.js";
+import { isoNow, now } from "../../utils/time.js";
+import {
+  compactDetails,
+  formatBrowserTarget,
+  resolveBrowserTarget,
+} from "../browser/browserSelectors.js";
+import type { ElectronStatusOptions } from "./electronStatus.js";
+import { getElectronDriverStatus } from "./electronStatus.js";
 import type {
   ElectronActionResult,
   ElectronActionTarget,
@@ -19,29 +31,8 @@ import type {
   ElectronFillOptions,
   ElectronOpenOptions,
   ElectronPressOptions,
-  ElectronScreenshotOptions
+  ElectronScreenshotOptions,
 } from "./electronTypes.js";
-import { getElectronDriverStatus } from "./electronStatus.js";
-import type { ElectronStatusOptions } from "./electronStatus.js";
-import type {
-  DesktopSession,
-  ScreenshotResult,
-  SessionId
-} from "../../types.js";
-import { ProcessError } from "../../errors.js";
-import {
-  createSanitizedEnvironment,
-  findExecutableOnPath,
-  waitForSpawn
-} from "../../utils/command.js";
-import { fileSize } from "../../utils/fs.js";
-import { isoNow, now } from "../../utils/time.js";
-import { terminateProcessTree } from "../../session/processTree.js";
-import {
-  compactDetails,
-  formatBrowserTarget,
-  resolveBrowserTarget
-} from "../browser/browserSelectors.js";
 
 interface ManagedElectronApp {
   readonly sessionId: SessionId;
@@ -71,14 +62,11 @@ export class PlaywrightElectronDriver implements ElectronDriver {
   async getStatus(): Promise<ElectronDriverStatus> {
     return await getElectronDriverStatus({
       env: this.env,
-      findExecutable: this.findExecutable
+      findExecutable: this.findExecutable,
     });
   }
 
-  async open(
-    session: DesktopSession,
-    options: ElectronOpenOptions
-  ): Promise<ElectronAppRef> {
+  async open(session: DesktopSession, options: ElectronOpenOptions): Promise<ElectronAppRef> {
     validateOpenOptions(options);
     const status = await this.getStatus();
     const launch = await this.resolvePlaywrightLaunch(options);
@@ -90,7 +78,7 @@ export class PlaywrightElectronDriver implements ElectronDriver {
         if (options.command) {
           return await this.openFallback(session, options, [
             `Playwright Electron failed: ${error instanceof Error ? error.message : String(error)}`,
-            "Use desktop_* X11 fallback tools for this session."
+            "Use desktop_* X11 fallback tools for this session.",
           ]);
         }
         throw error;
@@ -99,7 +87,7 @@ export class PlaywrightElectronDriver implements ElectronDriver {
 
     if (!options.command) {
       throw new ProcessError(
-        "openElectronApp requires command or executablePath/appPath when Playwright Electron launch is unavailable."
+        "openElectronApp requires command or executablePath/appPath when Playwright Electron launch is unavailable.",
       );
     }
 
@@ -109,20 +97,20 @@ export class PlaywrightElectronDriver implements ElectronDriver {
       launch
         ? undefined
         : "No Electron executable was found or the provided command is not an Electron executable.",
-      "Electron Playwright semantic mode is unavailable; use desktop_* X11 fallback tools."
+      "Electron Playwright semantic mode is unavailable; use desktop_* X11 fallback tools.",
     ].filter((value): value is string => value !== undefined);
     return await this.openFallback(session, options, warnings);
   }
 
   async click(
     session: DesktopSession,
-    options: ElectronClickOptions
+    options: ElectronClickOptions,
   ): Promise<ElectronActionResult> {
     const managed = this.requireApp(session.id, options.appId);
     if (managed.mode !== "playwright-electron" || !managed.page) {
       return unavailableResult(session, managed, "electron.click", {
         target: targetDetails(options),
-        label: options.label
+        label: options.label,
       });
     }
 
@@ -130,14 +118,11 @@ export class PlaywrightElectronDriver implements ElectronDriver {
     await locator.first().click({ timeout: options.timeoutMs ?? 5000 });
     return successResult(session, managed, "electron.click", {
       target: formatBrowserTarget(options),
-      label: options.label
+      label: options.label,
     });
   }
 
-  async fill(
-    session: DesktopSession,
-    options: ElectronFillOptions
-  ): Promise<ElectronActionResult> {
+  async fill(session: DesktopSession, options: ElectronFillOptions): Promise<ElectronActionResult> {
     const managed = this.requireApp(session.id, options.appId);
     const details = {
       target: targetDetails(options),
@@ -145,7 +130,7 @@ export class PlaywrightElectronDriver implements ElectronDriver {
       valueLength: options.value.length,
       value: options.secret === true ? undefined : truncateForLog(options.value),
       truncated: options.secret === true ? undefined : options.value.length > 256,
-      label: options.label
+      label: options.label,
     };
     if (managed.mode !== "playwright-electron" || !managed.page) {
       return unavailableResult(session, managed, "electron.fill", details);
@@ -158,7 +143,7 @@ export class PlaywrightElectronDriver implements ElectronDriver {
 
   async press(
     session: DesktopSession,
-    options: ElectronPressOptions
+    options: ElectronPressOptions,
   ): Promise<ElectronActionResult> {
     if (options.key.trim().length === 0) {
       throw new ProcessError("electronPress requires a non-empty key.");
@@ -169,7 +154,7 @@ export class PlaywrightElectronDriver implements ElectronDriver {
       return unavailableResult(session, managed, "electron.press", {
         key: options.key,
         target: hasAnyTarget(options) ? targetDetails(options) : undefined,
-        label: options.label
+        label: options.label,
       });
     }
 
@@ -183,13 +168,13 @@ export class PlaywrightElectronDriver implements ElectronDriver {
     return successResult(session, managed, "electron.press", {
       key: options.key,
       target: hasAnyTarget(options) ? targetDetails(options) : undefined,
-      label: options.label
+      label: options.label,
     });
   }
 
   async assertText(
     session: DesktopSession,
-    options: ElectronAssertTextOptions
+    options: ElectronAssertTextOptions,
   ): Promise<ElectronActionResult> {
     if (options.text.trim().length === 0) {
       throw new ProcessError("electronAssertText requires non-empty text.");
@@ -199,7 +184,7 @@ export class PlaywrightElectronDriver implements ElectronDriver {
     if (managed.mode !== "playwright-electron" || !managed.page) {
       return unavailableResult(session, managed, "electron.assert_text", {
         text: options.text,
-        label: options.label
+        label: options.label,
       });
     }
 
@@ -209,7 +194,7 @@ export class PlaywrightElectronDriver implements ElectronDriver {
       .waitFor({ state: "visible", timeout: options.timeoutMs ?? 5000 });
     return successResult(session, managed, "electron.assert_text", {
       text: options.text,
-      label: options.label
+      label: options.label,
     });
   }
 
@@ -217,7 +202,7 @@ export class PlaywrightElectronDriver implements ElectronDriver {
     session: DesktopSession,
     filePath: string,
     sequence: number,
-    options: ElectronScreenshotOptions
+    options: ElectronScreenshotOptions,
   ): Promise<ScreenshotResult | undefined> {
     const managed = this.requireApp(session.id, options.appId);
     if (managed.mode !== "playwright-electron" || !managed.page) {
@@ -228,7 +213,7 @@ export class PlaywrightElectronDriver implements ElectronDriver {
     await managed.page.screenshot({
       path: filePath,
       fullPage: options.fullPage ?? false,
-      type: "png"
+      type: "png",
     });
     const size = await fileSize(filePath);
     if (size <= 0) {
@@ -247,7 +232,7 @@ export class PlaywrightElectronDriver implements ElectronDriver {
       createdAt,
       display: session.display,
       sequence,
-      label: options.label
+      label: options.label,
     };
   }
 
@@ -281,7 +266,7 @@ export class PlaywrightElectronDriver implements ElectronDriver {
     session: DesktopSession,
     options: ElectronOpenOptions,
     status: ElectronDriverStatus,
-    launch: ElectronLaunchConfig
+    launch: ElectronLaunchConfig,
   ): Promise<ElectronAppRef> {
     const createdAt = isoNow();
     const warnings = electronLaunchWarnings(status, launch);
@@ -295,17 +280,19 @@ export class PlaywrightElectronDriver implements ElectronDriver {
           ...session.config.env,
           ...options.env,
           DISPLAY: session.display,
-          AGENT_DESKTOP_HARNESS_SESSION_ID: session.id
-        })
-      )
+          AGENT_DESKTOP_HARNESS_SESSION_ID: session.id,
+        }),
+      ),
     });
 
     try {
       const page = await selectElectronWindow(electronApp, options);
       await page.bringToFront().catch(() => undefined);
-      await page.waitForLoadState("domcontentloaded", {
-        timeout: options.timeoutMs ?? 30_000
-      }).catch(() => undefined);
+      await page
+        .waitForLoadState("domcontentloaded", {
+          timeout: options.timeoutMs ?? 30_000,
+        })
+        .catch(() => undefined);
       const managed: ManagedElectronApp = {
         sessionId: session.id,
         appId: randomUUID(),
@@ -313,7 +300,7 @@ export class PlaywrightElectronDriver implements ElectronDriver {
         createdAt,
         electronApp,
         page,
-        warnings
+        warnings,
       };
       this.rememberApp(managed);
       const processId = electronApp.process()?.pid;
@@ -324,7 +311,7 @@ export class PlaywrightElectronDriver implements ElectronDriver {
         mode: "playwright-electron",
         processId,
         windowTitle: await page.title().catch(() => undefined),
-        warnings: managed.warnings
+        warnings: managed.warnings,
       };
     } catch (error) {
       await electronApp.close().catch(() => undefined);
@@ -335,7 +322,7 @@ export class PlaywrightElectronDriver implements ElectronDriver {
   private async openFallback(
     session: DesktopSession,
     options: ElectronOpenOptions,
-    warnings: readonly string[]
+    warnings: readonly string[],
   ): Promise<ElectronAppRef> {
     if (!options.command) {
       throw new ProcessError("Electron X11 fallback requires command.");
@@ -348,10 +335,10 @@ export class PlaywrightElectronDriver implements ElectronDriver {
         ...session.config.env,
         ...options.env,
         DISPLAY: session.display,
-        AGENT_DESKTOP_HARNESS_SESSION_ID: session.id
+        AGENT_DESKTOP_HARNESS_SESSION_ID: session.id,
       }),
       shell: false,
-      stdio: "ignore"
+      stdio: "ignore",
     });
     await waitForSpawn(child, options.command);
 
@@ -361,7 +348,7 @@ export class PlaywrightElectronDriver implements ElectronDriver {
       mode: "x11-fallback",
       createdAt: isoNow(),
       appProcess: child,
-      warnings
+      warnings,
     };
     this.rememberApp(managed);
     return {
@@ -370,32 +357,33 @@ export class PlaywrightElectronDriver implements ElectronDriver {
       createdAt: managed.createdAt,
       mode: "x11-fallback",
       processId: child.pid,
-      warnings
+      warnings,
     };
   }
 
   private async resolvePlaywrightLaunch(
-    options: ElectronOpenOptions
+    options: ElectronOpenOptions,
   ): Promise<ElectronLaunchConfig | undefined> {
     const executablePath = await this.resolveElectronExecutable(options);
     if (!executablePath) {
       return undefined;
     }
 
-    const args = options.args && options.args.length > 0
-      ? [...options.args]
-      : options.appPath
-        ? [options.appPath]
-        : [];
+    const args =
+      options.args && options.args.length > 0
+        ? [...options.args]
+        : options.appPath
+          ? [options.appPath]
+          : [];
 
     return {
       executablePath,
-      args
+      args,
     };
   }
 
   private async resolveElectronExecutable(
-    options: ElectronOpenOptions
+    options: ElectronOpenOptions,
   ): Promise<string | undefined> {
     if (options.executablePath) {
       return await this.findExecutable(options.executablePath, this.env, options.cwd);
@@ -464,7 +452,7 @@ interface ElectronLaunchConfig {
 
 async function selectElectronWindow(
   electronApp: ElectronApplication,
-  options: ElectronOpenOptions
+  options: ElectronOpenOptions,
 ): Promise<Page> {
   const timeoutMs = options.timeoutMs ?? 30_000;
   const deadline = Date.now() + timeoutMs;
@@ -489,25 +477,19 @@ async function selectElectronWindow(
   return fallback;
 }
 
-async function requireLocator(
-  page: Page,
-  target: ElectronActionTarget
-): Promise<Locator> {
+async function requireLocator(page: Page, target: ElectronActionTarget): Promise<Locator> {
   const resolved = resolveBrowserTarget(target);
   const locator = locatorForTarget(page, resolved);
   const count = await locator.count().catch(() => 0);
   if (count < 1) {
     throw new ProcessError(
-      `Electron locator did not match any elements: ${JSON.stringify(resolved)}`
+      `Electron locator did not match any elements: ${JSON.stringify(resolved)}`,
     );
   }
   return locator;
 }
 
-function locatorForTarget(
-  page: Page,
-  resolved: ReturnType<typeof resolveBrowserTarget>
-): Locator {
+function locatorForTarget(page: Page, resolved: ReturnType<typeof resolveBrowserTarget>): Locator {
   switch (resolved.kind) {
     case "selector":
       return page.locator(resolved.value);
@@ -515,7 +497,7 @@ function locatorForTarget(
       return page.getByTestId(resolved.value);
     case "role":
       return page.getByRole(resolved.value as never, {
-        name: resolved.name
+        name: resolved.name,
       });
     case "label":
       return page.getByLabel(resolved.value);
@@ -551,7 +533,7 @@ function successResult(
   session: DesktopSession,
   app: ManagedElectronApp,
   actionType: string,
-  details: Readonly<Record<string, unknown>>
+  details: Readonly<Record<string, unknown>>,
 ): ElectronActionResult {
   return {
     sessionId: session.id,
@@ -561,7 +543,7 @@ function successResult(
     mode: app.mode,
     createdAt: isoNow(),
     details: compactDetails(details),
-    warnings: app.warnings
+    warnings: app.warnings,
   };
 }
 
@@ -569,7 +551,7 @@ function unavailableResult(
   session: DesktopSession,
   app: ManagedElectronApp,
   actionType: string,
-  details: Readonly<Record<string, unknown>>
+  details: Readonly<Record<string, unknown>>,
 ): ElectronActionResult {
   return {
     sessionId: session.id,
@@ -581,9 +563,10 @@ function unavailableResult(
     details: compactDetails({
       ...details,
       unavailable: true,
-      guidance: "Electron Playwright semantic mode is unavailable; use desktop_* X11 fallback tools."
+      guidance:
+        "Electron Playwright semantic mode is unavailable; use desktop_* X11 fallback tools.",
     }),
-    warnings: app.warnings
+    warnings: app.warnings,
   };
 }
 
@@ -595,7 +578,7 @@ function targetDetails(target: ElectronActionTarget): Readonly<Record<string, un
     name: target.name,
     targetLabel: target.label,
     placeholder: target.placeholder,
-    testId: target.testId
+    testId: target.testId,
   });
 }
 
@@ -624,19 +607,17 @@ async function delay(milliseconds: number): Promise<void> {
 
 function toPlaywrightEnv(env: NodeJS.ProcessEnv): Record<string, string> {
   return Object.fromEntries(
-    Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined)
+    Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined),
   );
 }
 
 function electronLaunchWarnings(
   status: ElectronDriverStatus,
-  launch: ElectronLaunchConfig
+  launch: ElectronLaunchConfig,
 ): readonly string[] {
   if (!launch.executablePath) {
     return status.warnings;
   }
 
-  return status.warnings.filter(
-    (warning) => !warning.includes("No electron binary was found")
-  );
+  return status.warnings.filter((warning) => !warning.includes("No electron binary was found"));
 }

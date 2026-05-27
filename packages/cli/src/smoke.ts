@@ -1,16 +1,16 @@
 import {
-  SessionManager,
   type DesktopSession,
   type LaunchResult,
+  SessionManager,
   type WaitForStableScreenResult,
-  type WindowInfo
+  type WindowInfo,
 } from "@agent-desktop-harness/core";
 import {
+  type DoctorReport,
   findDependencyStatus,
   formatMissingRequiredMessage,
   getMissingRequiredDependencies,
   runDoctor,
-  type DoctorReport
 } from "./doctor.js";
 import { defaultWorkspacePath } from "./workspace.js";
 
@@ -47,12 +47,11 @@ export interface SmokeX11Options {
 
 export async function runSmokeX11(
   args: readonly string[],
-  options: SmokeX11Options = {}
+  options: SmokeX11Options = {},
 ): Promise<SmokeX11Result> {
   const parsed = parseSmokeX11Args(args);
   const report =
-    options.doctorReport ??
-    (await (options.runDoctor ?? (async () => await runDoctor()))());
+    options.doctorReport ?? (await (options.runDoctor ?? (async () => await runDoctor()))());
   ensureSmokeReady(report, parsed.command);
 
   const manager = options.manager ?? new SessionManager();
@@ -65,24 +64,24 @@ export async function runSmokeX11(
     session = await manager.createSession({
       workspacePath: parsed.workspacePath,
       policy: {
-        allowedCommands: [parsed.command]
-      }
+        allowedCommands: [parsed.command],
+      },
     });
 
     const launch = await manager.launchApp(session.id, {
       command: parsed.command,
       args: parsed.args,
-      cwd: parsed.workspacePath
+      cwd: parsed.workspacePath,
     });
 
     await manager.waitForWindow(session.id, {
       excludeDevtools: true,
       preferLargest: true,
-      timeoutMs: 5000
+      timeoutMs: 5000,
     });
     const windows = await manager.getWindows(session.id);
     const firstScreenshot = await manager.captureScreenshot(session.id, {
-      label: "smoke-initial"
+      label: "smoke-initial",
     });
     const targetWindow = selectSmokeWindow(windows, parsed.command);
     const focused = await manager.focusWindow(session.id, { id: targetWindow.id });
@@ -90,15 +89,15 @@ export async function runSmokeX11(
     await manager.click(session.id, {
       x: 100,
       y: 100,
-      label: "smoke-click"
+      label: "smoke-click",
     });
     await manager.typeText(session.id, {
       text: parsed.text,
-      label: "smoke-type"
+      label: "smoke-type",
     });
 
     const secondScreenshot = await manager.captureScreenshot(session.id, {
-      label: "smoke-after-type"
+      label: "smoke-after-type",
     });
     const stableScreen = await manager.waitForStableScreen(session.id, {
       label: "smoke-stable",
@@ -107,7 +106,7 @@ export async function runSmokeX11(
       stableChecks: 1,
       mode: "tolerant",
       fileSizeToleranceBytes: 2048,
-      retainOnlyLast: true
+      retainOnlyLast: true,
     });
 
     result = {
@@ -118,7 +117,7 @@ export async function runSmokeX11(
       screenshots: [firstScreenshot.path, secondScreenshot.path],
       windows,
       focusedWindow: focused.window,
-      stableScreen: formatStableScreenResult(stableScreen)
+      stableScreen: formatStableScreenResult(stableScreen),
     };
   } finally {
     if (session) {
@@ -130,7 +129,7 @@ export async function runSmokeX11(
         console.error(
           `Smoke cleanup failed for session ${session.id}: ${
             error instanceof Error ? error.message : String(error)
-          }`
+          }`,
         );
       }
     }
@@ -147,7 +146,7 @@ export async function runSmokeX11(
   return {
     ...result,
     cleanupSucceeded,
-    stopped: cleanupSucceeded
+    stopped: cleanupSucceeded,
   };
 }
 
@@ -194,7 +193,7 @@ export function parseSmokeX11Args(args: readonly string[]): SmokeX11Args {
     workspacePath,
     command,
     args: commandArgs,
-    text
+    text,
   };
 }
 
@@ -210,17 +209,13 @@ export function ensureSmokeReady(report: DoctorReport, command: string): void {
       [
         "Missing optional smoke dependency for the default demo command: xterm",
         `Install it with: ${xtermStatus.installHint}`,
-        "Or pass --command with another allowlisted GUI command."
-      ].join("\n")
+        "Or pass --command with another allowlisted GUI command.",
+      ].join("\n"),
     );
   }
 }
 
-function requireValue(
-  args: readonly string[],
-  index: number,
-  optionName: string
-): string {
+function requireValue(args: readonly string[], index: number, optionName: string): string {
   const value = args[index + 1];
   if (!value) {
     throw new Error(`${optionName} requires a value.`);
@@ -228,22 +223,17 @@ function requireValue(
   return value;
 }
 
-function selectSmokeWindow(
-  windows: readonly WindowInfo[],
-  command: string
-): WindowInfo {
+function selectSmokeWindow(windows: readonly WindowInfo[], command: string): WindowInfo {
   const commandName = command.split("/").at(-1)?.toLowerCase() ?? command.toLowerCase();
-  const matching = windows.find((window) =>
-    window.title.toLowerCase().includes(commandName)
-  );
+  const matching = windows.find((window) => window.title.toLowerCase().includes(commandName));
 
   return matching ?? windows[0]!;
 }
 
-async function waitForWindows(
+async function _waitForWindows(
   manager: SessionManager,
   sessionId: string,
-  timeoutMs: number
+  timeoutMs: number,
 ): Promise<readonly WindowInfo[]> {
   const deadline = Date.now() + timeoutMs;
 
@@ -259,13 +249,13 @@ async function waitForWindows(
 }
 
 function formatStableScreenResult(
-  result: WaitForStableScreenResult
+  result: WaitForStableScreenResult,
 ): SmokeX11Result["stableScreen"] {
   return {
     stable: result.stable,
     checks: result.checks,
     elapsedMs: result.elapsedMs,
-    lastScreenshotPath: result.lastScreenshot?.path
+    lastScreenshotPath: result.lastScreenshot?.path,
   };
 }
 

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { makeDriverRouterStatus, selectDriver } from "./driverSelection.js";
 import type { DriverRouterStatus } from "./driverRouterTypes.js";
+import { makeDriverRouterStatus, selectDriver } from "./driverSelection.js";
 
 test("selectDriver chooses browser semantic driver for browser apps", () => {
   const decision = selectDriver(makeStatus(), {
-    appKind: "browser"
+    appKind: "browser",
   });
 
   assert.equal(decision.selectedDriver, "browser-playwright");
@@ -16,13 +16,13 @@ test("selectDriver chooses browser semantic driver for browser apps", () => {
 test("selectDriver chooses Tauri WebDriver when available and fallback when unavailable", () => {
   assert.equal(
     selectDriver(makeStatus({ tauriAvailable: true }), {
-      appKind: "tauri"
+      appKind: "tauri",
     }).selectedDriver,
-    "tauri-webdriver"
+    "tauri-webdriver",
   );
 
   const fallback = selectDriver(makeStatus({ tauriAvailable: false }), {
-    appKind: "tauri"
+    appKind: "tauri",
   });
   assert.equal(fallback.selectedDriver, "x11-fallback");
   assert.equal(fallback.fallbackUsed, true);
@@ -32,13 +32,13 @@ test("selectDriver chooses Tauri WebDriver when available and fallback when unav
 test("selectDriver chooses Electron Playwright when available and fallback when unavailable", () => {
   assert.equal(
     selectDriver(makeStatus({ electronAvailable: true }), {
-      appKind: "electron"
+      appKind: "electron",
     }).selectedDriver,
-    "electron-playwright"
+    "electron-playwright",
   );
 
   const fallback = selectDriver(makeStatus({ electronAvailable: false }), {
-    appKind: "electron"
+    appKind: "electron",
   });
   assert.equal(fallback.selectedDriver, "x11-fallback");
   assert.equal(fallback.fallbackUsed, true);
@@ -49,9 +49,9 @@ test("selectDriver fails clearly when semantic is required but unavailable", () 
     () =>
       selectDriver(makeStatus({ tauriAvailable: false }), {
         appKind: "tauri",
-        requireSemantic: true
+        requireSemantic: true,
       }),
-    /tauri-webdriver is unavailable/
+    /tauri-webdriver is unavailable/,
   );
 });
 
@@ -60,16 +60,16 @@ test("selectDriver fails when fallback is not allowed", () => {
     () =>
       selectDriver(makeStatus({ electronAvailable: false }), {
         appKind: "electron",
-        allowFallback: false
+        allowFallback: false,
       }),
-    /electron-playwright is unavailable/
+    /electron-playwright is unavailable/,
   );
 });
 
 test("selectDriver honors preferred drivers", () => {
   const decision = selectDriver(makeStatus(), {
     appKind: "browser",
-    preferredDriver: "x11-fallback"
+    preferredDriver: "x11-fallback",
   });
 
   assert.equal(decision.selectedDriver, "x11-fallback");
@@ -82,14 +82,14 @@ test("makeDriverRouterStatus maps driver prerequisite status", () => {
     tauri: {
       available: false,
       warnings: ["tauri warning"],
-      errors: ["tauri missing"]
+      errors: ["tauri missing"],
     },
     electron: {
       available: true,
       playwrightAvailable: true,
       warnings: [],
-      errors: []
-    }
+      errors: [],
+    },
   });
 
   assert.equal(status.tauri.available, false);
@@ -98,37 +98,34 @@ test("makeDriverRouterStatus maps driver prerequisite status", () => {
 });
 
 function makeStatus(
-  options: {
-    readonly tauriAvailable?: boolean;
-    readonly electronAvailable?: boolean;
-  } = {}
+  options: { readonly tauriAvailable?: boolean; readonly electronAvailable?: boolean } = {},
 ): DriverRouterStatus {
   return {
     browser: {
       available: true,
       driver: "browser-playwright",
       warnings: [],
-      errors: []
+      errors: [],
     },
     tauri: {
       available: options.tauriAvailable ?? true,
       driver: "tauri-webdriver",
       experimental: true,
       warnings: [],
-      errors: options.tauriAvailable === false ? ["tauri-driver is missing."] : []
+      errors: options.tauriAvailable === false ? ["tauri-driver is missing."] : [],
     },
     electron: {
       available: options.electronAvailable ?? true,
       driver: "electron-playwright",
       experimental: true,
       warnings: [],
-      errors: options.electronAvailable === false ? ["Playwright Electron is missing."] : []
+      errors: options.electronAvailable === false ? ["Playwright Electron is missing."] : [],
     },
     x11Fallback: {
       available: true,
       driver: "x11-fallback",
       warnings: [],
-      errors: []
-    }
+      errors: [],
+    },
   };
 }

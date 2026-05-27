@@ -1,19 +1,16 @@
-import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
 import { join } from "node:path";
-import {
-  detectGuiBrowser,
-  formatMissingGuiBrowserMessage
-} from "./browser.js";
 import type { GuiBrowser } from "./browser.js";
+import { detectGuiBrowser, formatMissingGuiBrowserMessage } from "./browser.js";
 import type { DoctorReport } from "./doctor.js";
-import { formatMissingRequiredMessage, getMissingRequiredDependencies, runDoctor } from "./doctor.js";
-import { httpJsonRequest, type FetchLike } from "./httpSmoke.js";
 import {
-  collectChildOutput,
-  runProcess,
-  stopChildProcess
-} from "./processUtils.js";
+  formatMissingRequiredMessage,
+  getMissingRequiredDependencies,
+  runDoctor,
+} from "./doctor.js";
+import { type FetchLike, httpJsonRequest } from "./httpSmoke.js";
+import { collectChildOutput, runProcess, stopChildProcess } from "./processUtils.js";
 import { repoRootPath } from "./repo.js";
 import { defaultWorkspacePath } from "./workspace.js";
 
@@ -54,16 +51,14 @@ export interface SmokeDriverRouterOptions {
 
 export async function runSmokeDriverRouter(
   args: readonly string[],
-  options: SmokeDriverRouterOptions = {}
+  options: SmokeDriverRouterOptions = {},
 ): Promise<SmokeDriverRouterResult> {
   const parsed = parseSmokeDriverRouterArgs(args);
   const report =
-    options.doctorReport ??
-    (await (options.runDoctor ?? (async () => await runDoctor()))());
+    options.doctorReport ?? (await (options.runDoctor ?? (async () => await runDoctor()))());
   ensureDriverRouterSmokeReady(report);
   const browser =
-    (await (options.detectBrowser ?? (async () => await detectGuiBrowser()))()) ??
-    undefined;
+    (await (options.detectBrowser ?? (async () => await detectGuiBrowser()))()) ?? undefined;
   if (!browser) {
     throw new Error(formatMissingGuiBrowserMessage());
   }
@@ -80,10 +75,12 @@ export async function runSmokeDriverRouter(
   let appClosed = false;
   let serverStopped = false;
   let viteStopped = false;
-  let result: Omit<
-    SmokeDriverRouterResult,
-    "cleanupSucceeded" | "stopped" | "appClosed" | "serverStopped" | "viteStopped"
-  > | undefined;
+  let result:
+    | Omit<
+        SmokeDriverRouterResult,
+        "cleanupSucceeded" | "stopped" | "appClosed" | "serverStopped" | "viteStopped"
+      >
+    | undefined;
   let runError: unknown;
   let cleanupError: unknown;
 
@@ -93,7 +90,7 @@ export async function runSmokeDriverRouter(
 
     await runProcess("pnpm", ["--filter", "@agent-desktop-harness/http-server", "build"], {
       cwd: rootPath,
-      env: process.env
+      env: process.env,
     });
     httpServer = startHttpServer(rootPath, parsed.httpPort);
     const httpOutput = collectChildOutput(httpServer);
@@ -111,9 +108,9 @@ export async function runSmokeDriverRouter(
           workspaceDir: parsed.workspacePath,
           width: 1440,
           height: 900,
-          depth: 24
-        }
-      }
+          depth: 24,
+        },
+      },
     );
     sessionId = createResponse.session.id;
 
@@ -124,13 +121,13 @@ export async function runSmokeDriverRouter(
         method: "POST",
         body: {
           appKind: "browser",
-          requireSemantic: true
-        }
-      }
+          requireSemantic: true,
+        },
+      },
     );
     if (routeResponse.decision.selectedDriver !== "browser-playwright") {
       throw new Error(
-        `Driver router selected ${routeResponse.decision.selectedDriver}; expected browser-playwright.`
+        `Driver router selected ${routeResponse.decision.selectedDriver}; expected browser-playwright.`,
       );
     }
 
@@ -145,17 +142,17 @@ export async function runSmokeDriverRouter(
           browserExecutablePath: browser.path,
           viewport: {
             width: 1440,
-            height: 900
+            height: 900,
           },
           requireSemantic: true,
-          label: "driver-router-open-demo"
-        }
-      }
+          label: "driver-router-open-demo",
+        },
+      },
     );
     appId = openResponse.app.appId;
     if (openResponse.selectedDriver !== "browser-playwright" || !openResponse.semantic) {
       throw new Error(
-        `app_open selected ${openResponse.selectedDriver} semantic=${String(openResponse.semantic)}.`
+        `app_open selected ${openResponse.selectedDriver} semantic=${String(openResponse.semantic)}.`,
       );
     }
 
@@ -163,22 +160,22 @@ export async function runSmokeDriverRouter(
       fetchLike,
       httpBaseUrl,
       sessionId,
-      "driver-router-initial"
+      "driver-router-initial",
     );
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/apps/fill`, {
       method: "POST",
       body: {
         placeholder: "Type a message",
-        value: parsed.text
-      }
+        value: parsed.text,
+      },
     });
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/apps/click`, {
       method: "POST",
       body: {
         role: "button",
         name: "Save message",
-        label: "driver-router-click-save"
-      }
+        label: "driver-router-click-save",
+      },
     });
     await assertAppText(fetchLike, httpBaseUrl, sessionId, "Status: saved");
     await assertAppText(fetchLike, httpBaseUrl, sessionId, parsed.text);
@@ -187,27 +184,27 @@ export async function runSmokeDriverRouter(
       body: {
         role: "button",
         name: "Open details",
-        label: "driver-router-click-details"
-      }
+        label: "driver-router-click-details",
+      },
     });
     await assertAppText(fetchLike, httpBaseUrl, sessionId, "Details panel is open");
     const detailsScreenshot = await appScreenshot(
       fetchLike,
       httpBaseUrl,
       sessionId,
-      "driver-router-details-open"
+      "driver-router-details-open",
     );
 
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/apps/close`, {
       method: "POST",
       body: {
-        appId
-      }
+        appId,
+      },
     });
     appClosed = true;
 
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}`, {
-      method: "DELETE"
+      method: "DELETE",
     });
     stopped = true;
 
@@ -221,10 +218,7 @@ export async function runSmokeDriverRouter(
       vitePort: parsed.vitePort,
       httpPort: parsed.httpPort,
       evidencePath: createResponse.session.evidencePath,
-      screenshots: [
-        initialScreenshot.screenshot.path,
-        detailsScreenshot.screenshot.path
-      ]
+      screenshots: [initialScreenshot.screenshot.path, detailsScreenshot.screenshot.path],
     };
   } catch (error) {
     runError = error;
@@ -235,8 +229,8 @@ export async function runSmokeDriverRouter(
         await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/apps/close`, {
           method: "POST",
           body: {
-            appId
-          }
+            appId,
+          },
         });
         appClosed = true;
       } catch (error) {
@@ -247,7 +241,7 @@ export async function runSmokeDriverRouter(
     if (sessionId && !stopped) {
       try {
         await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}`, {
-          method: "DELETE"
+          method: "DELETE",
         });
         stopped = true;
       } catch (error) {
@@ -290,7 +284,7 @@ export async function runSmokeDriverRouter(
     stopped,
     appClosed,
     serverStopped,
-    viteStopped
+    viteStopped,
   };
 }
 
@@ -334,7 +328,7 @@ export function parseSmokeDriverRouterArgs(args: readonly string[]): SmokeDriver
     workspacePath,
     vitePort,
     httpPort,
-    text
+    text,
   };
 }
 
@@ -350,20 +344,13 @@ function startViteServer(rootPath: string, port: number): ChildProcess {
 
   return spawn(
     process.execPath,
-    [
-      viteBin,
-      "--host",
-      VITE_URL_HOST,
-      "--port",
-      String(port),
-      "--strictPort"
-    ],
+    [viteBin, "--host", VITE_URL_HOST, "--port", String(port), "--strictPort"],
     {
       cwd: appPath,
       env: process.env,
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"]
-    }
+      stdio: ["ignore", "pipe", "pipe"],
+    },
   );
 }
 
@@ -373,10 +360,10 @@ function startHttpServer(rootPath: string, port: number): ChildProcess {
     env: {
       ...process.env,
       AGENT_DESKTOP_HARNESS_HOST: "127.0.0.1",
-      AGENT_DESKTOP_HARNESS_PORT: String(port)
+      AGENT_DESKTOP_HARNESS_PORT: String(port),
     },
     shell: false,
-    stdio: ["ignore", "pipe", "pipe"]
+    stdio: ["ignore", "pipe", "pipe"],
   });
 }
 
@@ -386,7 +373,7 @@ async function waitForHttpOk(
   server: { readonly exitCode: number | null; readonly signalCode: NodeJS.Signals | null },
   serverOutput: { readonly stdout: string; readonly stderr: string },
   label: string,
-  timeoutMs = 10_000
+  timeoutMs = 10_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
@@ -412,7 +399,7 @@ async function waitForHttpOk(
   throw new Error(
     `${label} server did not become ready within ${timeoutMs}ms: ${
       lastError instanceof Error ? lastError.message : String(lastError)
-    }`
+    }`,
   );
 }
 
@@ -421,7 +408,7 @@ async function waitForHttpJsonHealth(
   fetchLike: FetchLike,
   server: { readonly exitCode: number | null; readonly signalCode: NodeJS.Signals | null },
   serverOutput: { readonly stdout: string; readonly stderr: string },
-  timeoutMs = 10_000
+  timeoutMs = 10_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
@@ -434,7 +421,7 @@ async function waitForHttpJsonHealth(
     try {
       const result = await httpJsonRequest<{ readonly ok?: boolean }>(
         fetchLike,
-        `${baseUrl}/health`
+        `${baseUrl}/health`,
       );
       if (result.ok === true) {
         return;
@@ -449,7 +436,7 @@ async function waitForHttpJsonHealth(
   throw new Error(
     `Driver router HTTP smoke server did not become ready within ${timeoutMs}ms: ${
       lastError instanceof Error ? lastError.message : String(lastError)
-    }`
+    }`,
   );
 }
 
@@ -457,7 +444,7 @@ async function appScreenshot(
   fetchLike: FetchLike,
   baseUrl: string,
   sessionId: string,
-  label: string
+  label: string,
 ): Promise<AppScreenshotResponse> {
   return await httpJsonRequest<AppScreenshotResponse>(
     fetchLike,
@@ -466,9 +453,9 @@ async function appScreenshot(
       method: "POST",
       body: {
         label,
-        fullPage: false
-      }
-    }
+        fullPage: false,
+      },
+    },
   );
 }
 
@@ -476,36 +463,32 @@ async function assertAppText(
   fetchLike: FetchLike,
   baseUrl: string,
   sessionId: string,
-  text: string
+  text: string,
 ): Promise<void> {
   await httpJsonRequest(fetchLike, `${baseUrl}/sessions/${sessionId}/apps/assert-text`, {
     method: "POST",
     body: {
       text,
       timeoutMs: 5000,
-      label: `assert-${sanitizeLabel(text)}`
-    }
+      label: `assert-${sanitizeLabel(text)}`,
+    },
   });
 }
 
 function formatServerExitedMessage(
   label: string,
-  output: { readonly stdout: string; readonly stderr: string }
+  output: { readonly stdout: string; readonly stderr: string },
 ): string {
   return [
     `${label} server exited before it became ready.`,
     output.stderr.trim() ? `stderr:\n${output.stderr.trim()}` : undefined,
-    output.stdout.trim() ? `stdout:\n${output.stdout.trim()}` : undefined
+    output.stdout.trim() ? `stdout:\n${output.stdout.trim()}` : undefined,
   ]
     .filter(Boolean)
     .join("\n");
 }
 
-function requireValue(
-  args: readonly string[],
-  index: number,
-  optionName: string
-): string {
+function requireValue(args: readonly string[], index: number, optionName: string): string {
   const value = args[index + 1];
   if (!value) {
     throw new Error(`${optionName} requires a value.`);

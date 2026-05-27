@@ -11,7 +11,7 @@ test("Tauri docs describe WebDriver support as experimental", async () => {
     readRepoFile("README.md"),
     readRepoFile("docs/TAURI_WORKFLOW.md"),
     readRepoFile("docs/TAURI_DRIVER_SPIKE.md"),
-    readRepoFile("docs/ROADMAP.md")
+    readRepoFile("docs/ROADMAP.md"),
   ]);
   const combined = [readme, workflow, spike, roadmap].join("\n");
 
@@ -28,7 +28,7 @@ test("Electron docs describe Playwright support as experimental", async () => {
     readRepoFile("README.md"),
     readRepoFile("docs/ELECTRON_DRIVER_SPIKE.md"),
     readRepoFile("docs/ROADMAP.md"),
-    readRepoFile("docs/MCP_USAGE.md")
+    readRepoFile("docs/MCP_USAGE.md"),
   ]);
   const combined = [readme, spike, roadmap, mcp].join("\n");
 
@@ -45,7 +45,7 @@ test("driver router docs describe explicit fallback reporting", async () => {
     readRepoFile("README.md"),
     readRepoFile("docs/DRIVER_ROUTER.md"),
     readRepoFile("docs/ROADMAP.md"),
-    readRepoFile("docs/MCP_USAGE.md")
+    readRepoFile("docs/MCP_USAGE.md"),
   ]);
 
   assert.match(readme, /Driver router\s+\|\s+Verified/);
@@ -63,7 +63,7 @@ test("visual QA docs describe screenshot diff, baselines, and annotation asserti
     readRepoFile("docs/VISUAL_BASELINES.md"),
     readRepoFile("docs/ROADMAP.md"),
     readRepoFile("docs/MCP_USAGE.md"),
-    readRepoFile("docs/VISUAL_ANNOTATION_HANDOFF.md")
+    readRepoFile("docs/VISUAL_ANNOTATION_HANDOFF.md"),
   ]);
 
   assert.match(readme, /Visual diff\s+\|\s+Verified/);
@@ -88,7 +88,7 @@ test("live observer docs describe local-only optional noVNC support", async () =
     readRepoFile("docs/SECURITY.md"),
     readRepoFile("docs/ROADMAP.md"),
     readRepoFile("docs/MCP_USAGE.md"),
-    readRepoFile("docs/TROUBLESHOOTING_LINUX.md")
+    readRepoFile("docs/TROUBLESHOOTING_LINUX.md"),
   ]);
 
   assert.match(readme, /noVNC live observer\s+\|\s+Optional \/ dependency-gated/);
@@ -106,7 +106,7 @@ test("v0.2 release docs describe cockpit workflow and verification set", async (
     readRepoFile("README.md"),
     readRepoFile("docs/releases/v0.2.0.md"),
     readRepoFile("docs/AGENT_GUI_QA_COCKPIT.md"),
-    readRepoFile("docs/RELEASE_CHECKLIST.md")
+    readRepoFile("docs/RELEASE_CHECKLIST.md"),
   ]);
 
   assert.match(readme, /Linux-first GUI QA and visual handoff cockpit/);

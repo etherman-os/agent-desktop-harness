@@ -6,7 +6,7 @@ import type {
   DriverRouteDecision,
   DriverRouteRequest,
   DriverRouterStatus,
-  RoutedDriverKind
+  RoutedDriverKind,
 } from "./driverRouterTypes.js";
 
 export function makeDriverRouterStatus(input: {
@@ -18,36 +18,36 @@ export function makeDriverRouterStatus(input: {
       available: true,
       driver: "browser-playwright",
       warnings: [
-        "Browser semantic mode requires a host browser executable or browserExecutablePath."
+        "Browser semantic mode requires a host browser executable or browserExecutablePath.",
       ],
-      errors: []
+      errors: [],
     },
     tauri: {
       available: input.tauri.available,
       driver: "tauri-webdriver",
       experimental: true,
       warnings: input.tauri.warnings,
-      errors: input.tauri.errors
+      errors: input.tauri.errors,
     },
     electron: {
       available: input.electron.available,
       driver: "electron-playwright",
       experimental: true,
       warnings: input.electron.warnings,
-      errors: input.electron.errors
+      errors: input.electron.errors,
     },
     x11Fallback: {
       available: true,
       driver: "x11-fallback",
       warnings: [],
-      errors: []
-    }
+      errors: [],
+    },
   };
 }
 
 export function selectDriver(
   status: DriverRouterStatus,
-  request: DriverRouteRequest
+  request: DriverRouteRequest,
 ): DriverRouteDecision {
   const allowFallback = request.allowFallback ?? true;
   const preferredDriver = request.preferredDriver;
@@ -96,7 +96,7 @@ function decisionForDriver(
   status: DriverRouterStatus,
   appKind: AppKind,
   selectedDriver: RoutedDriverKind,
-  selectionMode: "auto" | "explicit"
+  selectionMode: "auto" | "explicit",
 ): DriverRouteDecision {
   const availability = availabilityForDriver(status, selectedDriver);
   const semantic = isSemanticDriver(selectedDriver);
@@ -113,14 +113,14 @@ function decisionForDriver(
       : [
           `${selectedDriver} is unavailable${
             availability.errors.length > 0 ? `: ${availability.errors.join("; ")}` : "."
-          }`
-        ]
+          }`,
+        ],
   };
 }
 
 function availabilityForDriver(
   status: DriverRouterStatus,
-  driver: RoutedDriverKind
+  driver: RoutedDriverKind,
 ): {
   readonly available: boolean;
   readonly warnings: readonly string[];
@@ -141,11 +141,11 @@ function availabilityForDriver(
 function enforceSemanticAndFallback(
   status: DriverRouterStatus,
   request: DriverRouteRequest,
-  decision: DriverRouteDecision
+  decision: DriverRouteDecision,
 ): DriverRouteDecision {
   if (request.requireSemantic === true && !decision.semantic) {
     throw new ProcessError(
-      `Semantic driver is required for appKind=${request.appKind}, but ${decision.selectedDriver} is not semantic.`
+      `Semantic driver is required for appKind=${request.appKind}, but ${decision.selectedDriver} is not semantic.`,
     );
   }
   if (decision.selectedDriver === "x11-fallback" && status.x11Fallback.available !== true) {
@@ -158,7 +158,7 @@ function fallbackDecision(
   status: DriverRouterStatus,
   appKind: AppKind,
   fallbackReason: string,
-  selectionMode: "auto" | "explicit"
+  selectionMode: "auto" | "explicit",
 ): DriverRouteDecision {
   if (!status.x11Fallback.available) {
     throw new ProcessError(`No driver is available. Fallback reason: ${fallbackReason}`);
@@ -171,10 +171,7 @@ function fallbackDecision(
     semantic: false,
     fallbackUsed: true,
     fallbackReason,
-    warnings: [
-      ...status.x11Fallback.warnings,
-      fallbackReason
-    ],
-    errors: []
+    warnings: [...status.x11Fallback.warnings, fallbackReason],
+    errors: [],
   };
 }

@@ -34,7 +34,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "echo \"No lint configured yet for @agent-desktop-harness/core\"",
+    "lint": "biome check . --max-diagnostics=100",
     "test": "pnpm build && node --test dist/session/displayAllocator.test.js dist/policy/PolicyValidator.test.js dist/evidence/EvidenceStore.test.js dist/input/XdotoolInputBackend.test.js dist/window/WmctrlWindowBackend.test.js dist/session/SessionManager.input.test.js dist/session/SessionManager.stable.test.js dist/session/SessionManager.visualHardening.test.js dist/drivers/browser/browserSelectors.test.js dist/drivers/browser/PlaywrightBrowserDriver.test.js dist/drivers/tauri/tauriStatus.test.js dist/drivers/tauri/TauriWebDriverDriver.test.js dist/drivers/electron/electronStatus.test.js dist/drivers/router/driverSelection.test.js dist/visual/imageDiff.test.js dist/visual/VisualQaService.test.js dist/visual/geometry.test.js dist/observer/NoVncObserver.test.js"
   },
   "dependencies": {

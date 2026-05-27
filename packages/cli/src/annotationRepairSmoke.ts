@@ -1,23 +1,22 @@
-import { readFile, rm, stat } from "node:fs/promises";
+import type { ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { mkdtemp } from "node:fs/promises";
-import { spawn } from "node:child_process";
-import type { ChildProcess } from "node:child_process";
+import type { GuiBrowser } from "./browser.js";
 import {
   buildBrowserLaunchConfig,
   detectGuiBrowser,
-  formatMissingGuiBrowserMessage
+  formatMissingGuiBrowserMessage,
 } from "./browser.js";
-import type { GuiBrowser } from "./browser.js";
 import type { DoctorReport } from "./doctor.js";
-import { formatMissingRequiredMessage, getMissingRequiredDependencies, runDoctor } from "./doctor.js";
-import { httpJsonRequest, type FetchLike } from "./httpSmoke.js";
 import {
-  collectChildOutput,
-  runProcess,
-  stopChildProcess
-} from "./processUtils.js";
+  formatMissingRequiredMessage,
+  getMissingRequiredDependencies,
+  runDoctor,
+} from "./doctor.js";
+import { type FetchLike, httpJsonRequest } from "./httpSmoke.js";
+import { collectChildOutput, runProcess, stopChildProcess } from "./processUtils.js";
 import { repoRootPath } from "./repo.js";
 import { defaultWorkspacePath } from "./workspace.js";
 
@@ -32,7 +31,7 @@ export const REPAIR_DEMO_ANNOTATION_RECT = {
   x: 600,
   y: 650,
   width: 360,
-  height: 140
+  height: 140,
 } as const;
 
 export interface SmokeAnnotationRepairArgs {
@@ -80,16 +79,14 @@ export interface SmokeAnnotationRepairOptions {
 
 export async function runSmokeAnnotationRepairDemo(
   args: readonly string[],
-  options: SmokeAnnotationRepairOptions = {}
+  options: SmokeAnnotationRepairOptions = {},
 ): Promise<SmokeAnnotationRepairResult> {
   const parsed = parseSmokeAnnotationRepairArgs(args);
   const report =
-    options.doctorReport ??
-    (await (options.runDoctor ?? (async () => await runDoctor()))());
+    options.doctorReport ?? (await (options.runDoctor ?? (async () => await runDoctor()))());
   ensureAnnotationRepairSmokeReady(report);
   const browser =
-    (await (options.detectBrowser ?? (async () => await detectGuiBrowser()))()) ??
-    undefined;
+    (await (options.detectBrowser ?? (async () => await detectGuiBrowser()))()) ?? undefined;
   if (!browser) {
     throw new Error(formatMissingGuiBrowserMessage());
   }
@@ -109,10 +106,12 @@ export async function runSmokeAnnotationRepairDemo(
   let stopped = false;
   let serverStopped = false;
   let viteStopped = false;
-  let result: Omit<
-    SmokeAnnotationRepairResult,
-    "cleanupSucceeded" | "stopped" | "serverStopped" | "viteStopped"
-  > | undefined;
+  let result:
+    | Omit<
+        SmokeAnnotationRepairResult,
+        "cleanupSucceeded" | "stopped" | "serverStopped" | "viteStopped"
+      >
+    | undefined;
   let runError: unknown;
   let cleanupError: unknown;
 
@@ -122,7 +121,7 @@ export async function runSmokeAnnotationRepairDemo(
 
     await runProcess("pnpm", ["--filter", "@agent-desktop-harness/http-server", "build"], {
       cwd: rootPath,
-      env: process.env
+      env: process.env,
     });
     httpServer = startHttpServer(rootPath, parsed.httpPort);
     const httpOutput = collectChildOutput(httpServer);
@@ -140,10 +139,10 @@ export async function runSmokeAnnotationRepairDemo(
           height: 900,
           depth: 24,
           policy: {
-            allowedCommands: [browserLaunch.command]
-          }
-        }
-      }
+            allowedCommands: [browserLaunch.command],
+          },
+        },
+      },
     );
     sessionId = createResponse.session.id;
 
@@ -153,23 +152,27 @@ export async function runSmokeAnnotationRepairDemo(
         command: browserLaunch.command,
         args: browserLaunch.args,
         cwd: appPath,
-        label: "repair-demo-browser"
-      }
+        label: "repair-demo-browser",
+      },
     });
 
     await focusFirstWindow(fetchLike, httpBaseUrl, sessionId);
-    await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/wait-for-stable-screen`, {
-      method: "POST",
-      body: {
-        timeoutMs: 5000,
-        intervalMs: 500,
-        stableChecks: 1,
-        label: "repair-demo-before-stable",
-        mode: "tolerant",
-        fileSizeToleranceBytes: 4096,
-        retainOnlyLast: true
-      }
-    });
+    await httpJsonRequest(
+      fetchLike,
+      `${httpBaseUrl}/sessions/${sessionId}/wait-for-stable-screen`,
+      {
+        method: "POST",
+        body: {
+          timeoutMs: 5000,
+          intervalMs: 500,
+          stableChecks: 1,
+          label: "repair-demo-before-stable",
+          mode: "tolerant",
+          fileSizeToleranceBytes: 4096,
+          retainOnlyLast: true,
+        },
+      },
+    );
 
     const beforeScreenshot = await httpJsonRequest<ScreenshotResponse>(
       fetchLike,
@@ -177,9 +180,9 @@ export async function runSmokeAnnotationRepairDemo(
       {
         method: "POST",
         body: {
-          label: "repair-demo-before-annotation"
-        }
-      }
+          label: "repair-demo-before-annotation",
+        },
+      },
     );
     const screenshotFileName = basename(beforeScreenshot.screenshot.path);
 
@@ -188,8 +191,8 @@ export async function runSmokeAnnotationRepairDemo(
       `${httpBaseUrl}/sessions/${sessionId}/annotations`,
       {
         method: "POST",
-        body: createRepairDemoAnnotationPayload(screenshotFileName)
-      }
+        body: createRepairDemoAnnotationPayload(screenshotFileName),
+      },
     );
     await verifyAnnotationArtifacts(
       fetchLike,
@@ -197,31 +200,35 @@ export async function runSmokeAnnotationRepairDemo(
       sessionId,
       createResponse.session.evidencePath,
       screenshotFileName,
-      annotationResponse.annotation
+      annotationResponse.annotation,
     );
 
     await navigateBrowserTo(fetchLike, httpBaseUrl, sessionId, fixedUrl);
-    await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/wait-for-stable-screen`, {
-      method: "POST",
-      body: {
-        timeoutMs: 5000,
-        intervalMs: 500,
-        stableChecks: 1,
-        label: "repair-demo-after-fix-stable",
-        mode: "tolerant",
-        fileSizeToleranceBytes: 4096,
-        retainOnlyLast: true
-      }
-    });
+    await httpJsonRequest(
+      fetchLike,
+      `${httpBaseUrl}/sessions/${sessionId}/wait-for-stable-screen`,
+      {
+        method: "POST",
+        body: {
+          timeoutMs: 5000,
+          intervalMs: 500,
+          stableChecks: 1,
+          label: "repair-demo-after-fix-stable",
+          mode: "tolerant",
+          fileSizeToleranceBytes: 4096,
+          retainOnlyLast: true,
+        },
+      },
+    );
     const afterScreenshot = await httpJsonRequest<ScreenshotResponse>(
       fetchLike,
       `${httpBaseUrl}/sessions/${sessionId}/screenshot`,
       {
         method: "POST",
         body: {
-          label: "repair-demo-after-fix"
-        }
-      }
+          label: "repair-demo-after-fix",
+        },
+      },
     );
 
     const visualCompare = await httpJsonRequest<VisualCompareResponse>(
@@ -234,9 +241,9 @@ export async function runSmokeAnnotationRepairDemo(
           afterPath: afterScreenshot.screenshot.path,
           label: "repair-before-after",
           createDiffImage: true,
-          threshold: 0.1
-        }
-      }
+          threshold: 0.1,
+        },
+      },
     );
     if (!visualCompare.result.diffPath) {
       throw new Error("Annotation repair visual compare did not produce a diff image path.");
@@ -254,13 +261,13 @@ export async function runSmokeAnnotationRepairDemo(
           label: "repair-annotation-region-change",
           minDiffPixelRatio: 0.0001,
           threshold: 0.1,
-          createDiffImage: true
-        }
-      }
+          createDiffImage: true,
+        },
+      },
     );
     if (visualAssertChanged.result.passed !== true) {
       throw new Error(
-        `Annotation repair visual assert-changed failed with diffPixelRatio=${visualAssertChanged.result.diffPixelRatio}.`
+        `Annotation repair visual assert-changed failed with diffPixelRatio=${visualAssertChanged.result.diffPixelRatio}.`,
       );
     }
     if (visualAssertChanged.result.diffPath) {
@@ -280,9 +287,9 @@ export async function runSmokeAnnotationRepairDemo(
           minInsideDiffPixelRatio: 0.0001,
           maxOutsideDiffPixelRatio: 0.05,
           threshold: 0.1,
-          createDiffImage: true
-        }
-      }
+          createDiffImage: true,
+        },
+      },
     );
     if (visualAssertChangeContained.result.diffPath) {
       await stat(visualAssertChangeContained.result.diffPath);
@@ -290,11 +297,11 @@ export async function runSmokeAnnotationRepairDemo(
 
     const handoff = await httpJsonRequest<VisualHandoffResponse>(
       fetchLike,
-      `${httpBaseUrl}/sessions/${sessionId}/visual-handoff`
+      `${httpBaseUrl}/sessions/${sessionId}/visual-handoff`,
     );
 
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}`, {
-      method: "DELETE"
+      method: "DELETE",
     });
     stopped = true;
 
@@ -312,7 +319,7 @@ export async function runSmokeAnnotationRepairDemo(
       afterScreenshotPath: afterScreenshot.screenshot.path,
       visualCompare: summarizeVisualResult(visualCompare.result),
       visualAssertChanged: summarizeVisualResult(visualAssertChanged.result),
-      visualAssertChangeContained: summarizeVisualResult(visualAssertChangeContained.result)
+      visualAssertChangeContained: summarizeVisualResult(visualAssertChangeContained.result),
     };
   } catch (error) {
     runError = error;
@@ -321,7 +328,7 @@ export async function runSmokeAnnotationRepairDemo(
       try {
         const httpBaseUrl = `http://127.0.0.1:${parsed.httpPort}`;
         await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}`, {
-          method: "DELETE"
+          method: "DELETE",
         });
         stopped = true;
       } catch (error) {
@@ -365,13 +372,11 @@ export async function runSmokeAnnotationRepairDemo(
     cleanupSucceeded: stopped && serverStopped && viteStopped,
     stopped,
     serverStopped,
-    viteStopped
+    viteStopped,
   };
 }
 
-export function parseSmokeAnnotationRepairArgs(
-  args: readonly string[]
-): SmokeAnnotationRepairArgs {
+export function parseSmokeAnnotationRepairArgs(args: readonly string[]): SmokeAnnotationRepairArgs {
   let workspacePath = defaultWorkspacePath();
   let vitePort = 5180;
   let httpPort = 7354;
@@ -403,7 +408,7 @@ export function parseSmokeAnnotationRepairArgs(
   return {
     workspacePath,
     vitePort,
-    httpPort
+    httpPort,
   };
 }
 
@@ -414,7 +419,7 @@ export function ensureAnnotationRepairSmokeReady(report: DoctorReport): void {
 }
 
 export function createRepairDemoAnnotationPayload(
-  screenshotFileName: string
+  screenshotFileName: string,
 ): CreateAnnotationPayload {
   return {
     screenshotFileName,
@@ -422,7 +427,7 @@ export function createRepairDemoAnnotationPayload(
     ...REPAIR_DEMO_ANNOTATION_RECT,
     note: REPAIR_DEMO_NOTE,
     color: "#ff0000",
-    cropPngBase64: TINY_PNG_DATA_URL
+    cropPngBase64: TINY_PNG_DATA_URL,
   };
 }
 
@@ -432,7 +437,7 @@ async function verifyAnnotationArtifacts(
   sessionId: string,
   evidencePath: string,
   screenshotFileName: string,
-  annotation: AnnotationResponse["annotation"]
+  annotation: AnnotationResponse["annotation"],
 ): Promise<void> {
   await stat(join(evidencePath, "annotations.jsonl"));
   if (!annotation.cropPath) {
@@ -442,7 +447,7 @@ async function verifyAnnotationArtifacts(
 
   const annotations = await httpJsonRequest<AnnotationsResponse>(
     fetchLike,
-    `${baseUrl}/sessions/${sessionId}/annotations`
+    `${baseUrl}/sessions/${sessionId}/annotations`,
   );
   if (!annotations.annotations.some((item) => item.id === annotation.id)) {
     throw new Error(`Annotation was not listed by HTTP: ${annotation.id}`);
@@ -450,7 +455,7 @@ async function verifyAnnotationArtifacts(
 
   const handoff = await httpJsonRequest<VisualHandoffResponse>(
     fetchLike,
-    `${baseUrl}/sessions/${sessionId}/visual-handoff`
+    `${baseUrl}/sessions/${sessionId}/visual-handoff`,
   );
   await stat(handoff.path);
   const handoffText = await readFile(handoff.path, "utf8");
@@ -468,7 +473,7 @@ async function verifyAnnotationArtifacts(
 async function focusFirstWindow(
   fetchLike: FetchLike,
   baseUrl: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<void> {
   const response = await httpJsonRequest<WaitForWindowResponse>(
     fetchLike,
@@ -478,15 +483,15 @@ async function focusFirstWindow(
       body: {
         excludeDevtools: true,
         preferLargest: true,
-        timeoutMs: 8000
-      }
-    }
+        timeoutMs: 8000,
+      },
+    },
   );
   await httpJsonRequest(fetchLike, `${baseUrl}/sessions/${sessionId}/focus-window`, {
     method: "POST",
     body: {
-      id: response.window.id
-    }
+      id: response.window.id,
+    },
   });
   await delay(500);
 }
@@ -495,31 +500,31 @@ async function navigateBrowserTo(
   fetchLike: FetchLike,
   baseUrl: string,
   sessionId: string,
-  url: string
+  url: string,
 ): Promise<void> {
   await focusFirstWindow(fetchLike, baseUrl, sessionId);
   await httpJsonRequest(fetchLike, `${baseUrl}/sessions/${sessionId}/hotkey`, {
     method: "POST",
     body: {
       keys: ["ctrl", "l"],
-      label: "repair-demo-focus-address"
-    }
+      label: "repair-demo-focus-address",
+    },
   });
   await delay(100);
   await httpJsonRequest(fetchLike, `${baseUrl}/sessions/${sessionId}/type-text`, {
     method: "POST",
     body: {
       text: url,
-      label: "repair-demo-type-fixed-url"
-    }
+      label: "repair-demo-type-fixed-url",
+    },
   });
   await delay(100);
   await httpJsonRequest(fetchLike, `${baseUrl}/sessions/${sessionId}/hotkey`, {
     method: "POST",
     body: {
       keys: ["Enter"],
-      label: "repair-demo-navigate-fixed"
-    }
+      label: "repair-demo-navigate-fixed",
+    },
   });
   await delay(1000);
 }
@@ -531,7 +536,7 @@ function summarizeVisualResult(result: VisualCompareResult): VisualQaSmokeSummar
     diffPath: result.diffPath,
     insideDiffPixelRatio: result.insideDiffPixelRatio,
     outsideDiffPixelRatio: result.outsideDiffPixelRatio,
-    containmentPassed: result.containmentPassed
+    containmentPassed: result.containmentPassed,
   };
 }
 
@@ -541,20 +546,13 @@ function startViteServer(rootPath: string, port: number): ChildProcess {
 
   return spawn(
     process.execPath,
-    [
-      viteBin,
-      "--host",
-      VITE_URL_HOST,
-      "--port",
-      String(port),
-      "--strictPort"
-    ],
+    [viteBin, "--host", VITE_URL_HOST, "--port", String(port), "--strictPort"],
     {
       cwd: appPath,
       env: process.env,
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"]
-    }
+      stdio: ["ignore", "pipe", "pipe"],
+    },
   );
 }
 
@@ -564,10 +562,10 @@ function startHttpServer(rootPath: string, port: number): ChildProcess {
     env: {
       ...process.env,
       AGENT_DESKTOP_HARNESS_HOST: "127.0.0.1",
-      AGENT_DESKTOP_HARNESS_PORT: String(port)
+      AGENT_DESKTOP_HARNESS_PORT: String(port),
     },
     shell: false,
-    stdio: ["ignore", "pipe", "pipe"]
+    stdio: ["ignore", "pipe", "pipe"],
   });
 }
 
@@ -577,7 +575,7 @@ async function waitForHttpOk(
   server: { readonly exitCode: number | null; readonly signalCode: NodeJS.Signals | null },
   serverOutput: { readonly stdout: string; readonly stderr: string },
   label: string,
-  timeoutMs = 10_000
+  timeoutMs = 10_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
@@ -603,7 +601,7 @@ async function waitForHttpOk(
   throw new Error(
     `${label} server did not become ready within ${timeoutMs}ms: ${
       lastError instanceof Error ? lastError.message : String(lastError)
-    }`
+    }`,
   );
 }
 
@@ -612,7 +610,7 @@ async function waitForHttpJsonHealth(
   fetchLike: FetchLike,
   server: { readonly exitCode: number | null; readonly signalCode: NodeJS.Signals | null },
   serverOutput: { readonly stdout: string; readonly stderr: string },
-  timeoutMs = 10_000
+  timeoutMs = 10_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
@@ -625,7 +623,7 @@ async function waitForHttpJsonHealth(
     try {
       const result = await httpJsonRequest<{ readonly ok?: boolean }>(
         fetchLike,
-        `${baseUrl}/health`
+        `${baseUrl}/health`,
       );
       if (result.ok === true) {
         return;
@@ -640,22 +638,22 @@ async function waitForHttpJsonHealth(
   throw new Error(
     `Annotation repair HTTP smoke server did not become ready within ${timeoutMs}ms: ${
       lastError instanceof Error ? lastError.message : String(lastError)
-    }`
+    }`,
   );
 }
 
-async function waitForHttpWindows(
+async function _waitForHttpWindows(
   fetchLike: FetchLike,
   baseUrl: string,
   sessionId: string,
-  timeoutMs = 8000
+  timeoutMs = 8000,
 ): Promise<HttpWindowInfo[]> {
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
     const response = await httpJsonRequest<WindowsResponse>(
       fetchLike,
-      `${baseUrl}/sessions/${sessionId}/windows`
+      `${baseUrl}/sessions/${sessionId}/windows`,
     );
     if (response.windows.length > 0) {
       return response.windows;
@@ -668,22 +666,18 @@ async function waitForHttpWindows(
 
 function formatServerExitedMessage(
   label: string,
-  output: { readonly stdout: string; readonly stderr: string }
+  output: { readonly stdout: string; readonly stderr: string },
 ): string {
   return [
     `${label} server exited before it became ready.`,
     output.stderr.trim() ? `stderr:\n${output.stderr.trim()}` : undefined,
-    output.stdout.trim() ? `stdout:\n${output.stdout.trim()}` : undefined
+    output.stdout.trim() ? `stdout:\n${output.stdout.trim()}` : undefined,
   ]
     .filter(Boolean)
     .join("\n");
 }
 
-function requireValue(
-  args: readonly string[],
-  index: number,
-  optionName: string
-): string {
+function requireValue(args: readonly string[], index: number, optionName: string): string {
   const value = args[index + 1];
   if (!value) {
     throw new Error(`${optionName} requires a value.`);

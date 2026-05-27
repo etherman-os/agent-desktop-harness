@@ -146,6 +146,12 @@ The Vite/browser smokes also require a graphical browser such as Chromium, Chrom
 AGENT_DESKTOP_HARNESS_BROWSER=/usr/bin/firefox pnpm smoke:vite:http
 ```
 
+The Hermes Studio capture contract smoke also requires a graphical browser. It writes a deterministic PNG path that a caller can verify:
+
+```sh
+pnpm smoke:studio-capture-contract
+```
+
 The dependency helper is never run automatically by package scripts or tests.
 
 ## CLI
@@ -166,6 +172,7 @@ pnpm smoke:driver-router
 pnpm smoke:visual-qa
 pnpm smoke:visual-baseline
 pnpm smoke:observer
+pnpm smoke:studio-capture-contract
 ```
 
 The smoke commands are manual integration checks. They are not part of `pnpm test` because they require local Linux GUI dependencies and a real Xvfb runtime.
@@ -179,7 +186,7 @@ pnpm --filter @agent-desktop-harness/http-server dev
 curl http://127.0.0.1:7341/health
 ```
 
-The default bind host is `127.0.0.1`. Do not expose the HTTP server to the public internet.
+The default bind host is `127.0.0.1`. The server rejects non-loopback bind hosts; use only `127.0.0.1`, `localhost`, or `::1`. Do not expose the HTTP server to the public internet.
 
 Typical HTTP workflow:
 
@@ -337,6 +344,7 @@ The smoke passes when observer dependencies are available and skips honestly whe
 | Visual Annotation Handoff |                           MVP verified | `smoke:annotation-repair` |
 | Visual diff               |                               Verified | `smoke:visual-qa`       |
 | Visual baselines          |                               Verified | `smoke:visual-baseline` |
+| Hermes Studio capture contract |                         Verified | `smoke:studio-capture-contract` |
 | Annotation region assertions |                            Verified | `smoke:annotation-repair` |
 | Change containment        |                               Verified | `smoke:annotation-repair` |
 | noVNC live observer       |            Optional / dependency-gated | `smoke:observer`        |
@@ -360,14 +368,14 @@ The smoke passes when observer dependencies are available and skips honestly whe
 - Browser semantic screenshots are page-content screenshots; desktop screenshots remain X11 root-window screenshots.
 - Stable-check screenshots may be moved to `transient/` so reports focus on retained screenshots.
 - Built-in annotation UI supports rectangle drawing only.
-- HTTP server has no authentication and is local-only by default.
+- HTTP server has no authentication and is loopback-only.
 - Sessions are in-memory per server process.
 - Visual annotation repair smoke proves handoff and verification, not autonomous LLM repair.
 - Evidence may contain sensitive screenshots, local paths, and typed text unless redaction is explicitly used.
 
 ## Generated Evidence
 
-The repository intentionally does not commit generated smoke screenshots, visual diffs, baselines, or session evidence by default. Run the smoke commands locally and inspect `.desktop-harness/sessions/<sessionId>/` for screenshots, `report.md`, `visual-handoff.md`, `visual-diffs/`, and `visual-assertions.jsonl`.
+The repository intentionally does not commit generated smoke screenshots, visual diffs, baselines, or session evidence by default. Run the smoke commands locally and inspect `.desktop-harness/sessions/<sessionId>/` for screenshots, `report.md`, `visual-handoff.md`, `visual-diffs/`, and `visual-assertions.jsonl`. The Hermes Studio contract smoke additionally writes `.desktop-harness/studio-capture-contract/screenshot.png` so external callers can verify a stable local file path.
 
 ## Development Checks
 

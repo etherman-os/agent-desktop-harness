@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  ensureDriverRouterSmokeReady,
-  parseSmokeDriverRouterArgs
-} from "./driverRouterSmoke.js";
 import type { DoctorReport } from "./doctor.js";
+import { ensureDriverRouterSmokeReady, parseSmokeDriverRouterArgs } from "./driverRouterSmoke.js";
 
 test("parseSmokeDriverRouterArgs uses stable local demo defaults", () => {
   const parsed = parseSmokeDriverRouterArgs([]);
@@ -24,7 +21,7 @@ test("parseSmokeDriverRouterArgs accepts explicit ports and text", () => {
     "--http-port",
     "7366",
     "--text",
-    "router smoke message"
+    "router smoke message",
   ]);
 
   assert.equal(parsed.workspacePath, "/tmp/driver-router-smoke");
@@ -34,14 +31,8 @@ test("parseSmokeDriverRouterArgs accepts explicit ports and text", () => {
 });
 
 test("parseSmokeDriverRouterArgs validates port values", () => {
-  assert.throws(
-    () => parseSmokeDriverRouterArgs(["--vite-port", "0"]),
-    /Invalid port/
-  );
-  assert.throws(
-    () => parseSmokeDriverRouterArgs(["--http-port", "70000"]),
-    /Invalid port/
-  );
+  assert.throws(() => parseSmokeDriverRouterArgs(["--vite-port", "0"]), /Invalid port/);
+  assert.throws(() => parseSmokeDriverRouterArgs(["--http-port", "70000"]), /Invalid port/);
 });
 
 test("ensureDriverRouterSmokeReady fails when required dependencies are missing", () => {
@@ -53,13 +44,10 @@ test("ensureDriverRouterSmokeReady fails when required dependencies are missing"
         name: "Xvfb",
         level: "required",
         installHint: "sudo apt install -y xvfb",
-        found: false
-      }
-    ]
+        found: false,
+      },
+    ],
   };
 
-  assert.throws(
-    () => ensureDriverRouterSmokeReady(report),
-    /Missing required dependencies: Xvfb/
-  );
+  assert.throws(() => ensureDriverRouterSmokeReady(report), /Missing required dependencies: Xvfb/);
 });

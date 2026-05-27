@@ -1,7 +1,5 @@
 import { _electron } from "playwright-core";
-import {
-  findExecutableOnPath
-} from "../../utils/command.js";
+import { findExecutableOnPath } from "../../utils/command.js";
 import type { ElectronDriverStatus } from "./electronTypes.js";
 
 export interface ElectronStatusOptions {
@@ -10,7 +8,7 @@ export interface ElectronStatusOptions {
 }
 
 export async function getElectronDriverStatus(
-  options: ElectronStatusOptions = {}
+  options: ElectronStatusOptions = {},
 ): Promise<ElectronDriverStatus> {
   const env = options.env ?? process.env;
   const findExecutable = options.findExecutable ?? findExecutableOnPath;
@@ -24,7 +22,7 @@ export async function getElectronDriverStatus(
   }
   if (!electronBinaryPath) {
     warnings.push(
-      "No electron binary was found on PATH; provide command or executablePath for Electron apps."
+      "No electron binary was found on PATH; provide command or executablePath for Electron apps.",
     );
   }
 
@@ -33,6 +31,6 @@ export async function getElectronDriverStatus(
     playwrightAvailable,
     electronBinaryPath,
     warnings,
-    errors
+    errors,
   };
 }

@@ -1,16 +1,27 @@
 import { randomUUID } from "node:crypto";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, basename } from "node:path";
+import { basename, join } from "node:path";
 import {
-  chromium,
-  firefox,
   type Browser,
   type BrowserContext,
   type BrowserType,
+  chromium,
+  firefox,
   type Locator,
-  type Page
+  type Page,
 } from "playwright-core";
+import { ProcessError } from "../../errors.js";
+import type { DesktopSession, ScreenshotResult, SessionId } from "../../types.js";
+import { createSanitizedEnvironment, findExecutableOnPath } from "../../utils/command.js";
+import { fileSize } from "../../utils/fs.js";
+import { isoNow, now } from "../../utils/time.js";
+import {
+  compactDetails,
+  formatBrowserTarget,
+  makeBrowserFillDetails,
+  resolveBrowserTarget,
+} from "./browserSelectors.js";
 import type {
   BrowserActionResult,
   BrowserAssertTextOptions,
@@ -22,26 +33,8 @@ import type {
   BrowserPageRef,
   BrowserPressOptions,
   BrowserScreenshotOptions,
-  BrowserSelectorTarget
+  BrowserSelectorTarget,
 } from "./browserTypes.js";
-import {
-  compactDetails,
-  formatBrowserTarget,
-  makeBrowserFillDetails,
-  resolveBrowserTarget
-} from "./browserSelectors.js";
-import type {
-  DesktopSession,
-  ScreenshotResult,
-  SessionId
-} from "../../types.js";
-import { ProcessError } from "../../errors.js";
-import {
-  createSanitizedEnvironment,
-  findExecutableOnPath
-} from "../../utils/command.js";
-import { fileSize } from "../../utils/fs.js";
-import { isoNow, now } from "../../utils/time.js";
 
 export interface PlaywrightBrowserDriverOptions {
   readonly env?: NodeJS.ProcessEnv;
@@ -71,7 +64,7 @@ const BROWSER_CANDIDATES: readonly {
   { command: "chromium-browser", name: "chromium" },
   { command: "google-chrome", name: "chrome" },
   { command: "google-chrome-stable", name: "chrome" },
-  { command: "firefox", name: "firefox" }
+  { command: "firefox", name: "firefox" },
 ];
 
 export class PlaywrightBrowserDriver implements BrowserDriver {
@@ -86,16 +79,13 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
     this.findExecutable = options.findExecutable ?? findExecutableOnPath;
   }
 
-  async open(
-    session: DesktopSession,
-    options: BrowserOpenOptions
-  ): Promise<BrowserPageRef> {
+  async open(session: DesktopSession, options: BrowserOpenOptions): Promise<BrowserPageRef> {
     validateOpenOptions(options);
     const executable = await this.resolveExecutable(options);
     const browserType = getBrowserType(executable.name);
     const viewport = options.viewport ?? {
       width: session.width,
-      height: session.height
+      height: session.height,
     };
     const launchOptions = {
       executablePath: executable.path,
@@ -103,8 +93,8 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
       args: browserLaunchArgs(executable.name, viewport),
       env: createSanitizedEnvironment({
         DISPLAY: session.display,
-        AGENT_DESKTOP_HARNESS_SESSION_ID: session.id
-      })
+        AGENT_DESKTOP_HARNESS_SESSION_ID: session.id,
+      }),
     };
 
     const pageId = randomUUID();
@@ -114,7 +104,7 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
     if (options.userDataDir) {
       context = await browserType.launchPersistentContext(options.userDataDir, {
         ...launchOptions,
-        viewport
+        viewport,
       });
     } else {
       browser = await browserType.launch(launchOptions);
@@ -124,9 +114,11 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
     const page = await context.newPage();
     await page.goto(options.url, {
       waitUntil: "domcontentloaded",
-      timeout: options.timeoutMs ?? 30_000
+      timeout: options.timeoutMs ?? 30_000,
     });
-    await page.waitForLoadState("load", { timeout: options.timeoutMs ?? 30_000 }).catch(() => undefined);
+    await page
+      .waitForLoadState("load", { timeout: options.timeoutMs ?? 30_000 })
+      .catch(() => undefined);
     await page.bringToFront().catch(() => undefined);
     const createdAt = isoNow();
     const managed: ManagedBrowserPage = {
@@ -135,7 +127,7 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
       context,
       browser,
       page,
-      createdAt
+      createdAt,
     };
     this.pages.set(pageId, managed);
     const pageIds = this.sessionPages.get(session.id) ?? new Set<string>();
@@ -148,27 +140,21 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
       pageId,
       url: page.url(),
       title: await page.title(),
-      createdAt
+      createdAt,
     };
   }
 
-  async click(
-    session: DesktopSession,
-    options: BrowserClickOptions
-  ): Promise<BrowserActionResult> {
+  async click(session: DesktopSession, options: BrowserClickOptions): Promise<BrowserActionResult> {
     const managed = this.requirePage(session.id, options.pageId);
     const locator = await this.requireLocator(managed.page, options);
     await locator.first().click({ timeout: options.timeoutMs ?? 5000 });
     return makeBrowserActionResult(session, managed.pageId, "browser.click", {
       target: formatBrowserTarget(options),
-      label: options.label
+      label: options.label,
     });
   }
 
-  async fill(
-    session: DesktopSession,
-    options: BrowserFillOptions
-  ): Promise<BrowserActionResult> {
+  async fill(session: DesktopSession, options: BrowserFillOptions): Promise<BrowserActionResult> {
     const managed = this.requirePage(session.id, options.pageId);
     const locator = await this.requireLocator(managed.page, options);
     await locator.first().fill(options.value, { timeout: options.timeoutMs ?? 5000 });
@@ -176,14 +162,11 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
       session,
       managed.pageId,
       "browser.fill",
-      makeBrowserFillDetails(options)
+      makeBrowserFillDetails(options),
     );
   }
 
-  async press(
-    session: DesktopSession,
-    options: BrowserPressOptions
-  ): Promise<BrowserActionResult> {
+  async press(session: DesktopSession, options: BrowserPressOptions): Promise<BrowserActionResult> {
     if (options.key.trim().length === 0) {
       throw new ProcessError("browserPress requires a non-empty key.");
     }
@@ -199,13 +182,13 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
     return makeBrowserActionResult(session, managed.pageId, "browser.press", {
       key: options.key,
       target: hasAnyTarget(options) ? formatBrowserTarget(options) : undefined,
-      label: options.label
+      label: options.label,
     });
   }
 
   async assertText(
     session: DesktopSession,
-    options: BrowserAssertTextOptions
+    options: BrowserAssertTextOptions,
   ): Promise<BrowserActionResult> {
     if (options.text.trim().length === 0) {
       throw new ProcessError("browserAssertText requires non-empty text.");
@@ -219,7 +202,7 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
 
     return makeBrowserActionResult(session, managed.pageId, "browser.assert_text", {
       text: options.text,
-      label: options.label
+      label: options.label,
     });
   }
 
@@ -227,7 +210,7 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
     session: DesktopSession,
     filePath: string,
     sequence: number,
-    options: BrowserScreenshotOptions
+    options: BrowserScreenshotOptions,
   ): Promise<ScreenshotResult> {
     const managed = this.requirePage(session.id, options.pageId);
     await takePageScreenshotWithRetries(managed.page, filePath, options);
@@ -249,7 +232,7 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
       createdAt,
       display: session.display,
       sequence,
-      label: options.label
+      label: options.label,
     };
   }
 
@@ -280,23 +263,18 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
     }
   }
 
-  private async resolveExecutable(
-    options: BrowserOpenOptions
-  ): Promise<DetectedBrowserExecutable> {
+  private async resolveExecutable(options: BrowserOpenOptions): Promise<DetectedBrowserExecutable> {
     if (options.browserExecutablePath) {
-      const resolved = await this.findExecutable(
-        options.browserExecutablePath,
-        this.env
-      );
+      const resolved = await this.findExecutable(options.browserExecutablePath, this.env);
       if (!resolved) {
         throw new ProcessError(
-          `Browser executable was not found or is not executable: ${options.browserExecutablePath}`
+          `Browser executable was not found or is not executable: ${options.browserExecutablePath}`,
         );
       }
       return {
         path: resolved,
         name: options.browserName ?? inferBrowserName(resolved),
-        source: "option"
+        source: "option",
       };
     }
 
@@ -305,20 +283,20 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
       const resolved = await this.findExecutable(override, this.env);
       if (!resolved) {
         throw new ProcessError(
-          `AGENT_DESKTOP_HARNESS_BROWSER is set but is not executable: ${override}`
+          `AGENT_DESKTOP_HARNESS_BROWSER is set but is not executable: ${override}`,
         );
       }
       return {
         path: resolved,
         name: options.browserName ?? inferBrowserName(resolved),
-        source: "env"
+        source: "env",
       };
     }
 
     const requestedBrowserName = options.browserName;
     const candidates = requestedBrowserName
       ? BROWSER_CANDIDATES.filter((candidate) =>
-          browserNameMatches(candidate.name, requestedBrowserName)
+          browserNameMatches(candidate.name, requestedBrowserName),
         )
       : BROWSER_CANDIDATES;
     for (const candidate of candidates) {
@@ -327,13 +305,13 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
         return {
           path: resolved,
           name: candidate.name,
-          source: "path"
+          source: "path",
         };
       }
     }
 
     throw new ProcessError(
-      "No supported browser executable was found. Install Chromium/Chrome or set AGENT_DESKTOP_HARNESS_BROWSER."
+      "No supported browser executable was found. Install Chromium/Chrome or set AGENT_DESKTOP_HARNESS_BROWSER.",
     );
   }
 
@@ -350,16 +328,13 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
     return page;
   }
 
-  private async requireLocator(
-    page: Page,
-    target: BrowserSelectorTarget
-  ): Promise<Locator> {
+  private async requireLocator(page: Page, target: BrowserSelectorTarget): Promise<Locator> {
     const resolved = resolveBrowserTarget(target);
     const locator = locatorForTarget(page, resolved);
     const count = await locator.count().catch(() => 0);
     if (count < 1) {
       throw new ProcessError(
-        `Browser locator did not match any elements: ${JSON.stringify(resolved)}`
+        `Browser locator did not match any elements: ${JSON.stringify(resolved)}`,
       );
     }
     return locator;
@@ -393,7 +368,7 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
 
 export function browserLaunchArgs(
   browserName: BrowserName,
-  viewport?: { readonly width: number; readonly height: number }
+  viewport?: { readonly width: number; readonly height: number },
 ): string[] {
   if (browserName === "firefox") {
     return [];
@@ -408,7 +383,7 @@ export function browserLaunchArgs(
     "--no-first-run",
     "--disable-default-apps",
     "--ozone-platform=x11",
-    "--window-position=0,0"
+    "--window-position=0,0",
   ];
   if (viewport) {
     args.push(`--window-size=${viewport.width},${viewport.height}`);
@@ -467,10 +442,7 @@ function browserNameMatches(candidate: BrowserName, requested: BrowserName): boo
   return candidate === requested;
 }
 
-function locatorForTarget(
-  page: Page,
-  resolved: ReturnType<typeof resolveBrowserTarget>
-): Locator {
+function locatorForTarget(page: Page, resolved: ReturnType<typeof resolveBrowserTarget>): Locator {
   switch (resolved.kind) {
     case "selector":
       return page.locator(resolved.value);
@@ -478,7 +450,7 @@ function locatorForTarget(
       return page.getByTestId(resolved.value);
     case "role":
       return page.getByRole(resolved.value as never, {
-        name: resolved.name
+        name: resolved.name,
       });
     case "label":
       return page.getByLabel(resolved.value);
@@ -493,7 +465,7 @@ function makeBrowserActionResult(
   session: DesktopSession,
   pageId: string,
   actionType: string,
-  details: Readonly<Record<string, unknown>>
+  details: Readonly<Record<string, unknown>>,
 ): BrowserActionResult {
   return {
     sessionId: session.id,
@@ -501,7 +473,7 @@ function makeBrowserActionResult(
     actionType,
     success: true,
     createdAt: isoNow(),
-    details: compactDetails(details)
+    details: compactDetails(details),
   };
 }
 
@@ -519,7 +491,7 @@ function hasAnyTarget(options: BrowserSelectorTarget): boolean {
 async function takePageScreenshotWithRetries(
   page: Page,
   filePath: string,
-  options: BrowserScreenshotOptions
+  options: BrowserScreenshotOptions,
 ): Promise<void> {
   const attempts = 4;
   let lastError: unknown;
@@ -534,7 +506,7 @@ async function takePageScreenshotWithRetries(
       await page.screenshot({
         path: filePath,
         fullPage: options.fullPage ?? false,
-        type: "png"
+        type: "png",
       });
       return;
     } catch (error) {

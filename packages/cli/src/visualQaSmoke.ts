@@ -1,20 +1,17 @@
-import { readFile, stat } from "node:fs/promises";
-import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  detectGuiBrowser,
-  formatMissingGuiBrowserMessage
-} from "./browser.js";
 import type { GuiBrowser } from "./browser.js";
+import { detectGuiBrowser, formatMissingGuiBrowserMessage } from "./browser.js";
 import type { DoctorReport } from "./doctor.js";
-import { formatMissingRequiredMessage, getMissingRequiredDependencies, runDoctor } from "./doctor.js";
-import { httpJsonRequest, type FetchLike } from "./httpSmoke.js";
 import {
-  collectChildOutput,
-  runProcess,
-  stopChildProcess
-} from "./processUtils.js";
+  formatMissingRequiredMessage,
+  getMissingRequiredDependencies,
+  runDoctor,
+} from "./doctor.js";
+import { type FetchLike, httpJsonRequest } from "./httpSmoke.js";
+import { collectChildOutput, runProcess, stopChildProcess } from "./processUtils.js";
 import { repoRootPath } from "./repo.js";
 import { defaultWorkspacePath } from "./workspace.js";
 
@@ -100,16 +97,14 @@ export interface SmokeVisualQaOptions {
 
 export async function runSmokeVisualQa(
   args: readonly string[],
-  options: SmokeVisualQaOptions = {}
+  options: SmokeVisualQaOptions = {},
 ): Promise<SmokeVisualQaResult> {
   const parsed = parseSmokeVisualQaArgs(args);
   const report =
-    options.doctorReport ??
-    (await (options.runDoctor ?? (async () => await runDoctor()))());
+    options.doctorReport ?? (await (options.runDoctor ?? (async () => await runDoctor()))());
   ensureVisualQaSmokeReady(report);
   const browser =
-    (await (options.detectBrowser ?? (async () => await detectGuiBrowser()))()) ??
-    undefined;
+    (await (options.detectBrowser ?? (async () => await detectGuiBrowser()))()) ?? undefined;
   if (!browser) {
     throw new Error(formatMissingGuiBrowserMessage());
   }
@@ -126,10 +121,12 @@ export async function runSmokeVisualQa(
   let appClosed = false;
   let serverStopped = false;
   let viteStopped = false;
-  let result: Omit<
-    SmokeVisualQaResult,
-    "cleanupSucceeded" | "stopped" | "appClosed" | "serverStopped" | "viteStopped"
-  > | undefined;
+  let result:
+    | Omit<
+        SmokeVisualQaResult,
+        "cleanupSucceeded" | "stopped" | "appClosed" | "serverStopped" | "viteStopped"
+      >
+    | undefined;
   let runError: unknown;
   let cleanupError: unknown;
 
@@ -139,7 +136,7 @@ export async function runSmokeVisualQa(
 
     await runProcess("pnpm", ["--filter", "@agent-desktop-harness/http-server", "build"], {
       cwd: rootPath,
-      env: process.env
+      env: process.env,
     });
     httpServer = startHttpServer(rootPath, parsed.httpPort);
     const httpOutput = collectChildOutput(httpServer);
@@ -155,9 +152,9 @@ export async function runSmokeVisualQa(
           workspaceDir: parsed.workspacePath,
           width: 1440,
           height: 900,
-          depth: 24
-        }
-      }
+          depth: 24,
+        },
+      },
     );
     sessionId = createResponse.session.id;
 
@@ -172,36 +169,41 @@ export async function runSmokeVisualQa(
           browserExecutablePath: browser.path,
           viewport: {
             width: 1440,
-            height: 900
+            height: 900,
           },
           requireSemantic: true,
-          label: "visual-qa-open-demo"
-        }
-      }
+          label: "visual-qa-open-demo",
+        },
+      },
     );
     appId = openResponse.app.appId;
     if (openResponse.selectedDriver !== "browser-playwright" || !openResponse.semantic) {
       throw new Error(
-        `app_open selected ${openResponse.selectedDriver} semantic=${String(openResponse.semantic)}.`
+        `app_open selected ${openResponse.selectedDriver} semantic=${String(openResponse.semantic)}.`,
       );
     }
 
-    const beforeScreenshot = await appScreenshot(fetchLike, httpBaseUrl, sessionId, "visual-qa-before");
+    const beforeScreenshot = await appScreenshot(
+      fetchLike,
+      httpBaseUrl,
+      sessionId,
+      "visual-qa-before",
+    );
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/apps/fill`, {
       method: "POST",
       body: {
         placeholder: "Type a message",
         value: parsed.text,
-        label: "visual-qa-fill-message"
-      }
+        label: "visual-qa-fill-message",
+      },
     });
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/apps/click`, {
       method: "POST",
       body: {
         role: "button",
         name: "Save message",
-        label: "visual-qa-click-save"
-      }
+        label: "visual-qa-click-save",
+      },
     });
     await assertAppText(fetchLike, httpBaseUrl, sessionId, "Status: saved");
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/apps/click`, {
@@ -209,11 +211,16 @@ export async function runSmokeVisualQa(
       body: {
         role: "button",
         name: "Open details",
-        label: "visual-qa-click-details"
-      }
+        label: "visual-qa-click-details",
+      },
     });
     await assertAppText(fetchLike, httpBaseUrl, sessionId, "Details panel is open");
-    const afterScreenshot = await appScreenshot(fetchLike, httpBaseUrl, sessionId, "visual-qa-after");
+    const afterScreenshot = await appScreenshot(
+      fetchLike,
+      httpBaseUrl,
+      sessionId,
+      "visual-qa-after",
+    );
 
     const compare = await httpJsonRequest<VisualCompareResponse>(
       fetchLike,
@@ -225,9 +232,9 @@ export async function runSmokeVisualQa(
           afterPath: afterScreenshot.screenshot.path,
           label: "visual-qa-before-after",
           createDiffImage: true,
-          threshold: 0.1
-        }
-      }
+          threshold: 0.1,
+        },
+      },
     );
     if (!compare.result.diffPath) {
       throw new Error("Visual QA compare did not produce a diff image path.");
@@ -244,33 +251,36 @@ export async function runSmokeVisualQa(
           afterPath: afterScreenshot.screenshot.path,
           label: "visual-qa-changed",
           minDiffPixelRatio: 0.00001,
-          threshold: 0.1
-        }
-      }
+          threshold: 0.1,
+        },
+      },
     );
     if (changed.result.passed !== true) {
       throw new Error(
-        `Visual QA assert-changed failed with diffPixelRatio=${changed.result.diffPixelRatio}.`
+        `Visual QA assert-changed failed with diffPixelRatio=${changed.result.diffPixelRatio}.`,
       );
     }
 
-    const visualAssertionsPath = join(createResponse.session.evidencePath, "visual-assertions.jsonl");
+    const visualAssertionsPath = join(
+      createResponse.session.evidencePath,
+      "visual-assertions.jsonl",
+    );
     await stat(visualAssertionsPath);
     await httpJsonRequest<VisualAssertionsResponse>(
       fetchLike,
-      `${httpBaseUrl}/sessions/${sessionId}/visual/assertions`
+      `${httpBaseUrl}/sessions/${sessionId}/visual/assertions`,
     );
 
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/apps/close`, {
       method: "POST",
       body: {
-        appId
-      }
+        appId,
+      },
     });
     appClosed = true;
 
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}`, {
-      method: "DELETE"
+      method: "DELETE",
     });
     stopped = true;
 
@@ -291,14 +301,11 @@ export async function runSmokeVisualQa(
       vitePort: parsed.vitePort,
       httpPort: parsed.httpPort,
       evidencePath: createResponse.session.evidencePath,
-      screenshots: [
-        beforeScreenshot.screenshot.path,
-        afterScreenshot.screenshot.path
-      ],
+      screenshots: [beforeScreenshot.screenshot.path, afterScreenshot.screenshot.path],
       visualAssertionsPath,
       reportPath,
       visualCompare: summarizeVisualResult(compare.result),
-      visualAssertChanged: summarizeVisualResult(changed.result)
+      visualAssertChanged: summarizeVisualResult(changed.result),
     };
   } catch (error) {
     runError = error;
@@ -309,8 +316,8 @@ export async function runSmokeVisualQa(
         await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/apps/close`, {
           method: "POST",
           body: {
-            appId
-          }
+            appId,
+          },
         });
         appClosed = true;
       } catch (error) {
@@ -321,7 +328,7 @@ export async function runSmokeVisualQa(
     if (sessionId && !stopped) {
       try {
         await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}`, {
-          method: "DELETE"
+          method: "DELETE",
         });
         stopped = true;
       } catch (error) {
@@ -364,22 +371,20 @@ export async function runSmokeVisualQa(
     stopped,
     appClosed,
     serverStopped,
-    viteStopped
+    viteStopped,
   };
 }
 
 export async function runSmokeVisualBaseline(
   args: readonly string[],
-  options: SmokeVisualQaOptions = {}
+  options: SmokeVisualQaOptions = {},
 ): Promise<SmokeVisualBaselineResult> {
   const parsed = parseSmokeVisualBaselineArgs(args);
   const report =
-    options.doctorReport ??
-    (await (options.runDoctor ?? (async () => await runDoctor()))());
+    options.doctorReport ?? (await (options.runDoctor ?? (async () => await runDoctor()))());
   ensureVisualQaSmokeReady(report);
   const browser =
-    (await (options.detectBrowser ?? (async () => await detectGuiBrowser()))()) ??
-    undefined;
+    (await (options.detectBrowser ?? (async () => await detectGuiBrowser()))()) ?? undefined;
   if (!browser) {
     throw new Error(formatMissingGuiBrowserMessage());
   }
@@ -396,10 +401,12 @@ export async function runSmokeVisualBaseline(
   let appClosed = false;
   let serverStopped = false;
   let viteStopped = false;
-  let result: Omit<
-    SmokeVisualBaselineResult,
-    "cleanupSucceeded" | "stopped" | "appClosed" | "serverStopped" | "viteStopped"
-  > | undefined;
+  let result:
+    | Omit<
+        SmokeVisualBaselineResult,
+        "cleanupSucceeded" | "stopped" | "appClosed" | "serverStopped" | "viteStopped"
+      >
+    | undefined;
   let runError: unknown;
   let cleanupError: unknown;
 
@@ -409,7 +416,7 @@ export async function runSmokeVisualBaseline(
 
     await runProcess("pnpm", ["--filter", "@agent-desktop-harness/http-server", "build"], {
       cwd: rootPath,
-      env: process.env
+      env: process.env,
     });
     httpServer = startHttpServer(rootPath, parsed.httpPort);
     const httpOutput = collectChildOutput(httpServer);
@@ -425,9 +432,9 @@ export async function runSmokeVisualBaseline(
           workspaceDir: parsed.workspacePath,
           width: 1440,
           height: 900,
-          depth: 24
-        }
-      }
+          depth: 24,
+        },
+      },
     );
     sessionId = createResponse.session.id;
 
@@ -442,17 +449,17 @@ export async function runSmokeVisualBaseline(
           browserExecutablePath: browser.path,
           viewport: {
             width: 1440,
-            height: 900
+            height: 900,
           },
           requireSemantic: true,
-          label: "visual-baseline-open-demo"
-        }
-      }
+          label: "visual-baseline-open-demo",
+        },
+      },
     );
     appId = openResponse.app.appId;
     if (openResponse.selectedDriver !== "browser-playwright" || !openResponse.semantic) {
       throw new Error(
-        `app_open selected ${openResponse.selectedDriver} semantic=${String(openResponse.semantic)}.`
+        `app_open selected ${openResponse.selectedDriver} semantic=${String(openResponse.semantic)}.`,
       );
     }
 
@@ -460,7 +467,7 @@ export async function runSmokeVisualBaseline(
       fetchLike,
       httpBaseUrl,
       sessionId,
-      "visual-baseline-clean"
+      "visual-baseline-clean",
     );
     const savedBaseline = await httpJsonRequest<VisualBaselineResponse>(
       fetchLike,
@@ -473,22 +480,22 @@ export async function runSmokeVisualBaseline(
           suite: parsed.baselineSuite,
           overwrite: true,
           metadata: {
-            smoke: "visual-baseline"
-          }
-        }
-      }
+            smoke: "visual-baseline",
+          },
+        },
+      },
     );
     await stat(savedBaseline.baseline.path);
 
     const baselines = await httpJsonRequest<VisualBaselinesResponse>(
       fetchLike,
-      `${httpBaseUrl}/sessions/${sessionId}/visual/baselines?suite=${encodeURIComponent(parsed.baselineSuite)}`
+      `${httpBaseUrl}/sessions/${sessionId}/visual/baselines?suite=${encodeURIComponent(parsed.baselineSuite)}`,
     );
     if (
       !baselines.baselines.some(
         (baseline) =>
           baseline.name === savedBaseline.baseline.name &&
-          baseline.suite === savedBaseline.baseline.suite
+          baseline.suite === savedBaseline.baseline.suite,
       )
     ) {
       throw new Error("Saved visual baseline was not returned by the baseline list route.");
@@ -505,13 +512,13 @@ export async function runSmokeVisualBaseline(
           suite: parsed.baselineSuite,
           label: "visual-baseline-clean-regression",
           maxDiffPixelRatio: 0,
-          createDiffImage: false
-        }
-      }
+          createDiffImage: false,
+        },
+      },
     );
     if (same.result.passed !== true) {
       throw new Error(
-        `Visual baseline same-image comparison failed with diffPixelRatio=${same.result.diffPixelRatio}.`
+        `Visual baseline same-image comparison failed with diffPixelRatio=${same.result.diffPixelRatio}.`,
       );
     }
 
@@ -520,16 +527,16 @@ export async function runSmokeVisualBaseline(
       body: {
         placeholder: "Type a message",
         value: parsed.text,
-        label: "visual-baseline-fill-message"
-      }
+        label: "visual-baseline-fill-message",
+      },
     });
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/apps/click`, {
       method: "POST",
       body: {
         role: "button",
         name: "Save message",
-        label: "visual-baseline-click-save"
-      }
+        label: "visual-baseline-click-save",
+      },
     });
     await assertAppText(fetchLike, httpBaseUrl, sessionId, "Status: saved");
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/apps/click`, {
@@ -537,15 +544,15 @@ export async function runSmokeVisualBaseline(
       body: {
         role: "button",
         name: "Open details",
-        label: "visual-baseline-click-details"
-      }
+        label: "visual-baseline-click-details",
+      },
     });
     await assertAppText(fetchLike, httpBaseUrl, sessionId, "Details panel is open");
     const changedScreenshot = await appScreenshot(
       fetchLike,
       httpBaseUrl,
       sessionId,
-      "visual-baseline-changed"
+      "visual-baseline-changed",
     );
 
     const changed = await httpJsonRequest<VisualCompareResponse>(
@@ -560,9 +567,9 @@ export async function runSmokeVisualBaseline(
           label: "visual-baseline-changed-regression",
           maxDiffPixelRatio: 0.00001,
           createDiffImage: true,
-          threshold: 0.1
-        }
-      }
+          threshold: 0.1,
+        },
+      },
     );
     if (changed.result.diffPixelRatio <= 0) {
       throw new Error("Visual baseline changed-image comparison reported no visual change.");
@@ -572,19 +579,22 @@ export async function runSmokeVisualBaseline(
     }
     await stat(changed.result.diffPath);
 
-    const visualAssertionsPath = join(createResponse.session.evidencePath, "visual-assertions.jsonl");
+    const visualAssertionsPath = join(
+      createResponse.session.evidencePath,
+      "visual-assertions.jsonl",
+    );
     await stat(visualAssertionsPath);
 
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/apps/close`, {
       method: "POST",
       body: {
-        appId
-      }
+        appId,
+      },
     });
     appClosed = true;
 
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}`, {
-      method: "DELETE"
+      method: "DELETE",
     });
     stopped = true;
 
@@ -609,14 +619,11 @@ export async function runSmokeVisualBaseline(
       baselineSuite: savedBaseline.baseline.suite ?? "default",
       baselinePath: savedBaseline.baseline.path,
       listedBaselineCount: baselines.baselines.length,
-      screenshots: [
-        cleanScreenshot.screenshot.path,
-        changedScreenshot.screenshot.path
-      ],
+      screenshots: [cleanScreenshot.screenshot.path, changedScreenshot.screenshot.path],
       visualAssertionsPath,
       reportPath,
       baselineSame: summarizeVisualResult(same.result),
-      baselineChanged: summarizeVisualResult(changed.result)
+      baselineChanged: summarizeVisualResult(changed.result),
     };
   } catch (error) {
     runError = error;
@@ -627,8 +634,8 @@ export async function runSmokeVisualBaseline(
         await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/apps/close`, {
           method: "POST",
           body: {
-            appId
-          }
+            appId,
+          },
         });
         appClosed = true;
       } catch (error) {
@@ -639,7 +646,7 @@ export async function runSmokeVisualBaseline(
     if (sessionId && !stopped) {
       try {
         await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}`, {
-          method: "DELETE"
+          method: "DELETE",
         });
         stopped = true;
       } catch (error) {
@@ -682,7 +689,7 @@ export async function runSmokeVisualBaseline(
     stopped,
     appClosed,
     serverStopped,
-    viteStopped
+    viteStopped,
   };
 }
 
@@ -726,7 +733,7 @@ export function parseSmokeVisualQaArgs(args: readonly string[]): SmokeVisualQaAr
     workspacePath,
     vitePort,
     httpPort,
-    text
+    text,
   };
 }
 
@@ -786,7 +793,7 @@ export function parseSmokeVisualBaselineArgs(args: readonly string[]): SmokeVisu
     httpPort,
     text,
     baselineName,
-    baselineSuite
+    baselineSuite,
   };
 }
 
@@ -802,20 +809,13 @@ function startViteServer(rootPath: string, port: number): ChildProcess {
 
   return spawn(
     process.execPath,
-    [
-      viteBin,
-      "--host",
-      VITE_URL_HOST,
-      "--port",
-      String(port),
-      "--strictPort"
-    ],
+    [viteBin, "--host", VITE_URL_HOST, "--port", String(port), "--strictPort"],
     {
       cwd: appPath,
       env: process.env,
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"]
-    }
+      stdio: ["ignore", "pipe", "pipe"],
+    },
   );
 }
 
@@ -825,10 +825,10 @@ function startHttpServer(rootPath: string, port: number): ChildProcess {
     env: {
       ...process.env,
       AGENT_DESKTOP_HARNESS_HOST: "127.0.0.1",
-      AGENT_DESKTOP_HARNESS_PORT: String(port)
+      AGENT_DESKTOP_HARNESS_PORT: String(port),
     },
     shell: false,
-    stdio: ["ignore", "pipe", "pipe"]
+    stdio: ["ignore", "pipe", "pipe"],
   });
 }
 
@@ -838,7 +838,7 @@ async function waitForHttpOk(
   server: { readonly exitCode: number | null; readonly signalCode: NodeJS.Signals | null },
   serverOutput: { readonly stdout: string; readonly stderr: string },
   label: string,
-  timeoutMs = 10_000
+  timeoutMs = 10_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
@@ -864,7 +864,7 @@ async function waitForHttpOk(
   throw new Error(
     `${label} server did not become ready within ${timeoutMs}ms: ${
       lastError instanceof Error ? lastError.message : String(lastError)
-    }`
+    }`,
   );
 }
 
@@ -873,7 +873,7 @@ async function waitForHttpJsonHealth(
   fetchLike: FetchLike,
   server: { readonly exitCode: number | null; readonly signalCode: NodeJS.Signals | null },
   serverOutput: { readonly stdout: string; readonly stderr: string },
-  timeoutMs = 10_000
+  timeoutMs = 10_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
@@ -886,7 +886,7 @@ async function waitForHttpJsonHealth(
     try {
       const result = await httpJsonRequest<{ readonly ok?: boolean }>(
         fetchLike,
-        `${baseUrl}/health`
+        `${baseUrl}/health`,
       );
       if (result.ok === true) {
         return;
@@ -901,7 +901,7 @@ async function waitForHttpJsonHealth(
   throw new Error(
     `Visual QA HTTP smoke server did not become ready within ${timeoutMs}ms: ${
       lastError instanceof Error ? lastError.message : String(lastError)
-    }`
+    }`,
   );
 }
 
@@ -909,7 +909,7 @@ async function appScreenshot(
   fetchLike: FetchLike,
   baseUrl: string,
   sessionId: string,
-  label: string
+  label: string,
 ): Promise<AppScreenshotResponse> {
   return await httpJsonRequest<AppScreenshotResponse>(
     fetchLike,
@@ -918,9 +918,9 @@ async function appScreenshot(
       method: "POST",
       body: {
         label,
-        fullPage: false
-      }
-    }
+        fullPage: false,
+      },
+    },
   );
 }
 
@@ -928,15 +928,15 @@ async function assertAppText(
   fetchLike: FetchLike,
   baseUrl: string,
   sessionId: string,
-  text: string
+  text: string,
 ): Promise<void> {
   await httpJsonRequest(fetchLike, `${baseUrl}/sessions/${sessionId}/apps/assert-text`, {
     method: "POST",
     body: {
       text,
       timeoutMs: 5000,
-      label: `assert-${sanitizeLabel(text)}`
-    }
+      label: `assert-${sanitizeLabel(text)}`,
+    },
   });
 }
 
@@ -944,28 +944,24 @@ function summarizeVisualResult(result: VisualCompareResult): VisualSmokeSummary 
   return {
     diffPixelRatio: result.diffPixelRatio,
     passed: result.passed,
-    diffPath: result.diffPath
+    diffPath: result.diffPath,
   };
 }
 
 function formatServerExitedMessage(
   label: string,
-  output: { readonly stdout: string; readonly stderr: string }
+  output: { readonly stdout: string; readonly stderr: string },
 ): string {
   return [
     `${label} server exited before it became ready.`,
     output.stderr.trim() ? `stderr:\n${output.stderr.trim()}` : undefined,
-    output.stdout.trim() ? `stdout:\n${output.stdout.trim()}` : undefined
+    output.stdout.trim() ? `stdout:\n${output.stdout.trim()}` : undefined,
   ]
     .filter(Boolean)
     .join("\n");
 }
 
-function requireValue(
-  args: readonly string[],
-  index: number,
-  optionName: string
-): string {
+function requireValue(args: readonly string[], index: number, optionName: string): string {
   const value = args[index + 1];
   if (!value) {
     throw new Error(`${optionName} requires a value.`);

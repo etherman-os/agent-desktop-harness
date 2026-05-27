@@ -1,8 +1,8 @@
-import { access } from "node:fs/promises";
 import { constants } from "node:fs";
+import { access } from "node:fs/promises";
 import { delimiter, isAbsolute, join } from "node:path";
-import { getElectronDriverStatus, getLiveObserverStatus } from "@agent-desktop-harness/core";
 import type { LiveObserverStatus } from "@agent-desktop-harness/core";
+import { getElectronDriverStatus, getLiveObserverStatus } from "@agent-desktop-harness/core";
 import { repoRootPath } from "./repo.js";
 
 export type DependencyLevel = "required" | "recommended" | "optional" | "experimental" | "observer";
@@ -46,98 +46,98 @@ export const DOCTOR_DEPENDENCIES: readonly DependencyDefinition[] = [
   {
     name: "Xvfb",
     level: "required",
-    installHint: "sudo apt install -y xvfb"
+    installHint: "sudo apt install -y xvfb",
   },
   {
     name: "xdpyinfo",
     level: "required",
-    installHint: "sudo apt install -y x11-utils"
+    installHint: "sudo apt install -y x11-utils",
   },
   {
     name: "scrot",
     level: "required",
-    installHint: "sudo apt install -y scrot"
+    installHint: "sudo apt install -y scrot",
   },
   {
     name: "xdotool",
     level: "required",
-    installHint: "sudo apt install -y xdotool"
+    installHint: "sudo apt install -y xdotool",
   },
   {
     name: "wmctrl",
     level: "required",
-    installHint: "sudo apt install -y wmctrl"
+    installHint: "sudo apt install -y wmctrl",
   },
   {
     name: "openbox",
     level: "recommended",
-    installHint: "sudo apt install -y openbox"
+    installHint: "sudo apt install -y openbox",
   },
   {
     name: "xterm",
     level: "optional",
-    installHint: "sudo apt install -y xterm"
+    installHint: "sudo apt install -y xterm",
   },
   {
     name: "chromium",
     level: "optional",
-    installHint: "sudo apt install -y chromium"
+    installHint: "sudo apt install -y chromium",
   },
   {
     name: "chromium-browser",
     level: "optional",
-    installHint: "sudo apt install -y chromium-browser"
+    installHint: "sudo apt install -y chromium-browser",
   },
   {
     name: "google-chrome",
     level: "optional",
-    installHint: "Install Google Chrome or use google-chrome-stable if available."
+    installHint: "Install Google Chrome or use google-chrome-stable if available.",
   },
   {
     name: "google-chrome-stable",
     level: "optional",
-    installHint: "Install Google Chrome Stable from the official package."
+    installHint: "Install Google Chrome Stable from the official package.",
   },
   {
     name: "firefox",
     level: "optional",
-    installHint: "sudo apt install -y firefox"
+    installHint: "sudo apt install -y firefox",
   },
   {
     name: "tauri-driver",
     level: "experimental",
-    installHint: "cargo install tauri-driver --locked"
+    installHint: "cargo install tauri-driver --locked",
   },
   {
     name: "WebKitWebDriver",
     level: "experimental",
-    installHint: "Install the WebKit WebDriver package for your distribution; package names vary."
+    installHint: "Install the WebKit WebDriver package for your distribution; package names vary.",
   },
   {
     name: "cargo",
     level: "experimental",
-    installHint: "Install Rust and Cargo from your distribution packages or rustup."
+    installHint: "Install Rust and Cargo from your distribution packages or rustup.",
   },
   {
     name: "x11vnc",
     level: "observer",
-    installHint: "sudo apt install -y x11vnc"
+    installHint: "sudo apt install -y x11vnc",
   },
   {
     name: "websockify",
     level: "observer",
-    installHint: "sudo apt install -y websockify"
+    installHint: "sudo apt install -y websockify",
   },
   {
     name: "novnc_proxy",
     level: "observer",
-    installHint: "sudo apt install -y novnc"
-  }
+    installHint: "sudo apt install -y novnc",
+  },
 ];
 
 export async function runDoctor(
   dependencies: readonly DependencyDefinition[] = DOCTOR_DEPENDENCIES,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
 ): Promise<DoctorReport> {
   const statuses = await Promise.all(
     dependencies.map(async (dependency) => {
@@ -145,16 +145,13 @@ export async function runDoctor(
       return {
         ...dependency,
         found: binary.found,
-        path: binary.path
+        path: binary.path,
       };
-    })
+    }),
   );
   const ready = getMissingRequiredDependencies(statuses).length === 0;
 
-  const electronDriver = await withLocalElectronBinary(
-    await getElectronDriverStatus({ env }),
-    env
-  );
+  const electronDriver = await withLocalElectronBinary(await getElectronDriverStatus({ env }), env);
   const liveObserver = await getLiveObserverStatus({ env });
 
   return {
@@ -163,25 +160,23 @@ export async function runDoctor(
     dependencies: statuses,
     experimental: {
       tauriDriver: makeTauriDriverExperimentalReport(statuses),
-      electronDriver
+      electronDriver,
     },
     optional: {
-      liveObserver
-    }
+      liveObserver,
+    },
   };
 }
 
 export async function checkBinary(
   name: string,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
 ): Promise<{ readonly found: boolean; readonly path?: string }> {
   const pathValue = env.PATH ?? "";
 
   if (name.includes("/") || isAbsolute(name)) {
     const candidate = isAbsolute(name) ? name : join(process.cwd(), name);
-    return (await isExecutable(candidate))
-      ? { found: true, path: candidate }
-      : { found: false };
+    return (await isExecutable(candidate)) ? { found: true, path: candidate } : { found: false };
   }
 
   for (const pathEntry of pathValue.split(delimiter)) {
@@ -193,7 +188,7 @@ export async function checkBinary(
     if (await isExecutable(candidate)) {
       return {
         found: true,
-        path: candidate
+        path: candidate,
       };
     }
   }
@@ -207,30 +202,22 @@ export function formatDoctorText(report: DoctorReport): string {
     "",
     ...formatDependencySection("Required dependencies", report.dependencies, "required"),
     "",
-    ...formatDependencySection(
-      "Recommended dependencies",
-      report.dependencies,
-      "recommended"
-    ),
+    ...formatDependencySection("Recommended dependencies", report.dependencies, "recommended"),
     "",
-    ...formatDependencySection(
-      "Optional smoke dependencies",
-      report.dependencies,
-      "optional"
-    ),
+    ...formatDependencySection("Optional smoke dependencies", report.dependencies, "optional"),
     "",
     ...formatLiveObserverSummary(report),
     "",
     ...formatDependencySection(
       "Experimental Tauri driver dependencies",
       report.dependencies,
-      "experimental"
+      "experimental",
     ),
     ...formatExperimentalTauriDriverSummary(report),
     "",
     ...formatExperimentalElectronDriverSummary(report),
     "",
-    `Status: ${report.status}`
+    `Status: ${report.status}`,
   ];
 
   return lines.join("\n");
@@ -238,7 +225,7 @@ export function formatDoctorText(report: DoctorReport): string {
 
 function formatLiveObserverSummary(report: DoctorReport): string[] {
   const observerDependencies = report.dependencies.filter(
-    (dependency) => dependency.level === "observer"
+    (dependency) => dependency.level === "observer",
   );
   const status = report.optional?.liveObserver;
   const webRootLine = status?.noVncWebRootPath
@@ -251,27 +238,25 @@ function formatLiveObserverSummary(report: DoctorReport): string[] {
     webRootLine,
     `  Live observer path: ${status?.available ? "available" : "unavailable"}`,
     ...(status?.errors ?? []).map((error) => `    error: ${error}`),
-    ...(status?.warnings ?? []).map((warning) => `    warning: ${warning}`)
+    ...(status?.warnings ?? []).map((warning) => `    warning: ${warning}`),
   ];
 }
 
 export function getMissingRequiredDependencies(
-  dependencies: readonly DependencyStatus[]
+  dependencies: readonly DependencyStatus[],
 ): DependencyStatus[] {
-  return dependencies.filter(
-    (dependency) => dependency.level === "required" && !dependency.found
-  );
+  return dependencies.filter((dependency) => dependency.level === "required" && !dependency.found);
 }
 
 export function findDependencyStatus(
   report: DoctorReport,
-  name: string
+  name: string,
 ): DependencyStatus | undefined {
   return report.dependencies.find((dependency) => dependency.name === name);
 }
 
 export function getTauriDriverDependencyStatuses(
-  dependencies: readonly DependencyStatus[]
+  dependencies: readonly DependencyStatus[],
 ): DependencyStatus[] {
   return dependencies.filter((dependency) => dependency.level === "experimental");
 }
@@ -282,37 +267,34 @@ export function formatMissingRequiredMessage(report: DoctorReport): string {
     return "";
   }
 
-  const hints = missing.map(
-    (dependency) => `  ${dependency.name}: ${dependency.installHint}`
-  );
+  const hints = missing.map((dependency) => `  ${dependency.name}: ${dependency.installHint}`);
 
   return [
     `Missing required dependencies: ${missing.map((dependency) => dependency.name).join(", ")}`,
     "Install them manually or run ./scripts/install-ubuntu-deps.sh.",
     "Install hints:",
-    ...hints
+    ...hints,
   ].join("\n");
 }
 
 function formatDependencySection(
   title: string,
   dependencies: readonly DependencyStatus[],
-  level: DependencyLevel
+  level: DependencyLevel,
 ): string[] {
   const matching = dependencies.filter((dependency) => dependency.level === level);
 
-  return [
-    `${title}:`,
-    ...matching.map((dependency) => `  ${formatDependencyLine(dependency)}`)
-  ];
+  return [`${title}:`, ...matching.map((dependency) => `  ${formatDependencyLine(dependency)}`)];
 }
 
 function makeTauriDriverExperimentalReport(
-  dependencies: readonly DependencyStatus[]
+  dependencies: readonly DependencyStatus[],
 ): NonNullable<DoctorReport["experimental"]>["tauriDriver"] {
   const tauriDependencies = getTauriDriverDependencyStatuses(dependencies);
   const tauriDriver = tauriDependencies.find((dependency) => dependency.name === "tauri-driver");
-  const webKitWebDriver = tauriDependencies.find((dependency) => dependency.name === "WebKitWebDriver");
+  const webKitWebDriver = tauriDependencies.find(
+    (dependency) => dependency.name === "WebKitWebDriver",
+  );
   const cargo = tauriDependencies.find((dependency) => dependency.name === "cargo");
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -334,14 +316,13 @@ function makeTauriDriverExperimentalReport(
     available: errors.length === 0,
     dependencies: tauriDependencies,
     warnings,
-    errors
+    errors,
   };
 }
 
 function formatExperimentalTauriDriverSummary(report: DoctorReport): string[] {
   const tauri =
-    report.experimental?.tauriDriver ??
-    makeTauriDriverExperimentalReport(report.dependencies);
+    report.experimental?.tauriDriver ?? makeTauriDriverExperimentalReport(report.dependencies);
   if (!tauri) {
     return [];
   }
@@ -351,7 +332,7 @@ function formatExperimentalTauriDriverSummary(report: DoctorReport): string[] {
   return [
     "  Tauri WebDriver semantic path: unavailable",
     ...tauri.errors.map((error) => `    error: ${error}`),
-    ...tauri.warnings.map((warning) => `    warning: ${warning}`)
+    ...tauri.warnings.map((warning) => `    warning: ${warning}`),
   ];
 }
 
@@ -361,7 +342,7 @@ function formatExperimentalElectronDriverSummary(report: DoctorReport): string[]
     return [
       "Experimental Electron driver:",
       "  playwright electron API: UNKNOWN",
-      "  electron binary: UNKNOWN"
+      "  electron binary: UNKNOWN",
     ];
   }
 
@@ -371,7 +352,7 @@ function formatExperimentalElectronDriverSummary(report: DoctorReport): string[]
     `  electron binary: ${electron.electronBinaryPath ? `OK      ${electron.electronBinaryPath}` : "MISSING/OPTIONAL"}`,
     `  Electron Playwright semantic path: ${electron.available ? "available" : "unavailable"}`,
     ...electron.errors.map((error) => `    error: ${error}`),
-    ...electron.warnings.map((warning) => `    warning: ${warning}`)
+    ...electron.warnings.map((warning) => `    warning: ${warning}`),
   ];
 }
 
@@ -379,7 +360,7 @@ function formatDependencyLine(dependency: DependencyStatus): string {
   const name = dependency.name.padEnd(9, " ");
   const state = dependency.found ? "OK" : "MISSING";
   const detail = dependency.found
-    ? dependency.path ?? "found"
+    ? (dependency.path ?? "found")
     : `install with: ${dependency.installHint}`;
 
   return `${name} ${state.padEnd(7, " ")} ${detail}`;
@@ -396,7 +377,7 @@ async function isExecutable(path: string): Promise<boolean> {
 
 async function withLocalElectronBinary(
   status: NonNullable<DoctorReport["experimental"]>["electronDriver"],
-  env: NodeJS.ProcessEnv
+  env: NodeJS.ProcessEnv,
 ): Promise<NonNullable<DoctorReport["experimental"]>["electronDriver"]> {
   if (status.electronBinaryPath) {
     return status;
@@ -404,7 +385,7 @@ async function withLocalElectronBinary(
 
   const candidates = [
     join(repoRootPath(), "node_modules", ".bin", "electron"),
-    join(repoRootPath(), "examples", "sample-electron-app", "node_modules", ".bin", "electron")
+    join(repoRootPath(), "examples", "sample-electron-app", "node_modules", ".bin", "electron"),
   ];
 
   for (const candidate of candidates) {
@@ -414,8 +395,8 @@ async function withLocalElectronBinary(
         ...status,
         electronBinaryPath: found.path,
         warnings: status.warnings.filter(
-          (warning) => !warning.includes("No electron binary was found")
-        )
+          (warning) => !warning.includes("No electron binary was found"),
+        ),
       };
     }
   }

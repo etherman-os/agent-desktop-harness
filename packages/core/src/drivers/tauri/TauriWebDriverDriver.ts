@@ -1,9 +1,21 @@
-import { randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
-import { isAbsolute, resolve } from "node:path";
 import { createServer } from "node:net";
+import { isAbsolute, resolve } from "node:path";
+import { ProcessError } from "../../errors.js";
+import { terminateProcessTree } from "../../session/processTree.js";
+import type { DesktopSession, ScreenshotResult, SessionId } from "../../types.js";
+import {
+  createSanitizedEnvironment,
+  findExecutableOnPath,
+  waitForSpawn,
+} from "../../utils/command.js";
+import { fileSize } from "../../utils/fs.js";
+import { isoNow, now } from "../../utils/time.js";
+import type { TauriStatusOptions } from "./tauriStatus.js";
+import { getTauriDriverStatus } from "./tauriStatus.js";
 import type {
   TauriActionResult,
   TauriActionTarget,
@@ -14,24 +26,8 @@ import type {
   TauriDriverStatus,
   TauriFillOptions,
   TauriOpenOptions,
-  TauriScreenshotOptions
+  TauriScreenshotOptions,
 } from "./tauriTypes.js";
-import { getTauriDriverStatus } from "./tauriStatus.js";
-import type { TauriStatusOptions } from "./tauriStatus.js";
-import type {
-  DesktopSession,
-  ScreenshotResult,
-  SessionId
-} from "../../types.js";
-import {
-  createSanitizedEnvironment,
-  findExecutableOnPath,
-  waitForSpawn
-} from "../../utils/command.js";
-import { fileSize } from "../../utils/fs.js";
-import { isoNow, now } from "../../utils/time.js";
-import { ProcessError } from "../../errors.js";
-import { terminateProcessTree } from "../../session/processTree.js";
 
 interface ManagedTauriApp {
   readonly sessionId: SessionId;
@@ -76,14 +72,11 @@ export class TauriWebDriverDriver implements TauriDriver {
     return await getTauriDriverStatus({
       env: this.env,
       platform: this.platform,
-      findExecutable: this.findExecutable
+      findExecutable: this.findExecutable,
     });
   }
 
-  async open(
-    session: DesktopSession,
-    options: TauriOpenOptions
-  ): Promise<TauriAppRef> {
+  async open(session: DesktopSession, options: TauriOpenOptions): Promise<TauriAppRef> {
     validateOpenOptions(options);
     const status = await this.getStatus();
     const applicationPath = await this.resolveApplicationPath(options);
@@ -94,7 +87,7 @@ export class TauriWebDriverDriver implements TauriDriver {
       } catch (error) {
         const fallback = await this.openFallback(session, options, [
           `Tauri WebDriver failed: ${error instanceof Error ? error.message : String(error)}`,
-          "Use desktop_* X11 fallback tools for this session."
+          "Use desktop_* X11 fallback tools for this session.",
         ]);
         return fallback;
       }
@@ -106,20 +99,17 @@ export class TauriWebDriverDriver implements TauriDriver {
       applicationPath
         ? undefined
         : "No built Tauri application path was provided or inferred; tauri-driver requires a built app binary.",
-      "Tauri WebDriver semantic mode is unavailable; use desktop_* X11 fallback tools."
+      "Tauri WebDriver semantic mode is unavailable; use desktop_* X11 fallback tools.",
     ].filter((value): value is string => value !== undefined);
     return await this.openFallback(session, options, warnings);
   }
 
-  async click(
-    session: DesktopSession,
-    options: TauriClickOptions
-  ): Promise<TauriActionResult> {
+  async click(session: DesktopSession, options: TauriClickOptions): Promise<TauriActionResult> {
     const managed = this.requireApp(session.id, options.appId);
     if (managed.mode !== "webdriver" || !managed.webdriverSessionId || !managed.webdriverUrl) {
       return unavailableResult(session, managed, "tauri.click", {
         target: targetDetails(options),
-        label: options.label
+        label: options.label,
       });
     }
 
@@ -128,18 +118,15 @@ export class TauriWebDriverDriver implements TauriDriver {
       managed,
       "POST",
       `/session/${managed.webdriverSessionId}/element/${element.elementId}/click`,
-      {}
+      {},
     );
     return successResult(session, managed, "tauri.click", {
       target: targetDetails(options),
-      label: options.label
+      label: options.label,
     });
   }
 
-  async fill(
-    session: DesktopSession,
-    options: TauriFillOptions
-  ): Promise<TauriActionResult> {
+  async fill(session: DesktopSession, options: TauriFillOptions): Promise<TauriActionResult> {
     const managed = this.requireApp(session.id, options.appId);
     if (managed.mode !== "webdriver" || !managed.webdriverSessionId || !managed.webdriverUrl) {
       return unavailableResult(session, managed, "tauri.fill", {
@@ -148,7 +135,7 @@ export class TauriWebDriverDriver implements TauriDriver {
         valueLength: options.value.length,
         value: options.secret === true ? undefined : truncateForLog(options.value),
         truncated: options.secret === true ? undefined : options.value.length > 256,
-        label: options.label
+        label: options.label,
       });
     }
 
@@ -157,7 +144,7 @@ export class TauriWebDriverDriver implements TauriDriver {
       managed,
       "POST",
       `/session/${managed.webdriverSessionId}/element/${element.elementId}/clear`,
-      {}
+      {},
     ).catch(() => undefined);
     await this.webdriverRequest(
       managed,
@@ -165,8 +152,8 @@ export class TauriWebDriverDriver implements TauriDriver {
       `/session/${managed.webdriverSessionId}/element/${element.elementId}/value`,
       {
         text: options.value,
-        value: [...options.value]
-      }
+        value: [...options.value],
+      },
     );
     return successResult(session, managed, "tauri.fill", {
       target: targetDetails(options),
@@ -174,13 +161,13 @@ export class TauriWebDriverDriver implements TauriDriver {
       valueLength: options.value.length,
       value: options.secret === true ? undefined : truncateForLog(options.value),
       truncated: options.secret === true ? undefined : options.value.length > 256,
-      label: options.label
+      label: options.label,
     });
   }
 
   async assertText(
     session: DesktopSession,
-    options: TauriAssertTextOptions
+    options: TauriAssertTextOptions,
   ): Promise<TauriActionResult> {
     const managed = this.requireApp(session.id, options.appId);
     if (options.text.trim().length === 0) {
@@ -189,14 +176,14 @@ export class TauriWebDriverDriver implements TauriDriver {
     if (managed.mode !== "webdriver" || !managed.webdriverSessionId || !managed.webdriverUrl) {
       return unavailableResult(session, managed, "tauri.assert_text", {
         text: options.text,
-        label: options.label
+        label: options.label,
       });
     }
 
     await this.findElement(managed, { text: options.text }, options.timeoutMs);
     return successResult(session, managed, "tauri.assert_text", {
       text: options.text,
-      label: options.label
+      label: options.label,
     });
   }
 
@@ -204,7 +191,7 @@ export class TauriWebDriverDriver implements TauriDriver {
     session: DesktopSession,
     filePath: string,
     sequence: number,
-    options: TauriScreenshotOptions
+    options: TauriScreenshotOptions,
   ): Promise<ScreenshotResult | undefined> {
     const managed = this.requireApp(session.id, options.appId);
     if (managed.mode !== "webdriver" || !managed.webdriverSessionId || !managed.webdriverUrl) {
@@ -214,7 +201,7 @@ export class TauriWebDriverDriver implements TauriDriver {
     const response = await this.webdriverRequest<string>(
       managed,
       "GET",
-      `/session/${managed.webdriverSessionId}/screenshot`
+      `/session/${managed.webdriverSessionId}/screenshot`,
     );
     await writeFile(filePath, Buffer.from(response, "base64"));
     const size = await fileSize(filePath);
@@ -233,7 +220,7 @@ export class TauriWebDriverDriver implements TauriDriver {
       createdAt,
       display: session.display,
       sequence,
-      label: options.label
+      label: options.label,
     };
   }
 
@@ -267,7 +254,7 @@ export class TauriWebDriverDriver implements TauriDriver {
     session: DesktopSession,
     options: TauriOpenOptions,
     status: TauriDriverStatus,
-    applicationPath: string
+    applicationPath: string,
   ): Promise<TauriAppRef> {
     const port = await reserveWebDriverPort(options.webdriverPort);
     const webdriverUrl = `http://127.0.0.1:${port}`;
@@ -280,11 +267,11 @@ export class TauriWebDriverDriver implements TauriDriver {
         env: createSanitizedEnvironment({
           ...session.config.env,
           DISPLAY: session.display,
-          AGENT_DESKTOP_HARNESS_SESSION_ID: session.id
+          AGENT_DESKTOP_HARNESS_SESSION_ID: session.id,
         }),
         shell: false,
-        stdio: "ignore"
-      }
+        stdio: "ignore",
+      },
     );
     await waitForSpawn(tauriDriverProcess, "tauri-driver");
 
@@ -295,7 +282,7 @@ export class TauriWebDriverDriver implements TauriDriver {
       createdAt: isoNow(),
       webdriverUrl,
       tauriDriverProcess,
-      warnings: status.warnings
+      warnings: status.warnings,
     };
 
     try {
@@ -303,7 +290,7 @@ export class TauriWebDriverDriver implements TauriDriver {
       const sessionId = await this.createWebDriverSession(webdriverUrl, applicationPath);
       const finalManaged = {
         ...managed,
-        webdriverSessionId: sessionId
+        webdriverSessionId: sessionId,
       };
       this.rememberApp(finalManaged);
       return {
@@ -312,7 +299,7 @@ export class TauriWebDriverDriver implements TauriDriver {
         webdriverUrl,
         createdAt: finalManaged.createdAt,
         mode: "webdriver",
-        warnings: finalManaged.warnings
+        warnings: finalManaged.warnings,
       };
     } catch (error) {
       await terminateProcessTree(tauriDriverProcess).catch(() => undefined);
@@ -323,7 +310,7 @@ export class TauriWebDriverDriver implements TauriDriver {
   private async openFallback(
     session: DesktopSession,
     options: TauriOpenOptions,
-    warnings: readonly string[]
+    warnings: readonly string[],
   ): Promise<TauriAppRef> {
     const cwd = resolve(options.cwd ?? session.workspacePath);
     const child = spawn(options.command, [...options.args], {
@@ -333,10 +320,10 @@ export class TauriWebDriverDriver implements TauriDriver {
         ...session.config.env,
         ...options.env,
         DISPLAY: session.display,
-        AGENT_DESKTOP_HARNESS_SESSION_ID: session.id
+        AGENT_DESKTOP_HARNESS_SESSION_ID: session.id,
       }),
       shell: false,
-      stdio: "ignore"
+      stdio: "ignore",
     });
     await waitForSpawn(child, options.command);
 
@@ -346,7 +333,7 @@ export class TauriWebDriverDriver implements TauriDriver {
       mode: "x11-fallback",
       createdAt: isoNow(),
       appProcess: child,
-      warnings
+      warnings,
     };
     this.rememberApp(managed);
 
@@ -356,7 +343,7 @@ export class TauriWebDriverDriver implements TauriDriver {
       processId: child.pid,
       createdAt: managed.createdAt,
       mode: "x11-fallback",
-      warnings
+      warnings,
     };
   }
 
@@ -406,20 +393,21 @@ export class TauriWebDriverDriver implements TauriDriver {
       await this.webdriverRequest(
         managed,
         "DELETE",
-        `/session/${managed.webdriverSessionId}`
+        `/session/${managed.webdriverSessionId}`,
       ).catch(() => undefined);
     }
     await terminateProcessTree(managed.appProcess).catch(() => undefined);
     await terminateProcessTree(managed.tauriDriverProcess).catch(() => undefined);
   }
 
-  private async resolveApplicationPath(
-    options: TauriOpenOptions
-  ): Promise<string | undefined> {
+  private async resolveApplicationPath(options: TauriOpenOptions): Promise<string | undefined> {
     const candidate = options.applicationPath?.trim();
     if (candidate) {
       const resolved = await this.findExecutable(candidate, this.env, options.cwd);
-      return resolved ?? (isAbsolute(candidate) ? candidate : resolve(options.cwd ?? process.cwd(), candidate));
+      return (
+        resolved ??
+        (isAbsolute(candidate) ? candidate : resolve(options.cwd ?? process.cwd(), candidate))
+      );
     }
 
     if (options.args.length === 0) {
@@ -431,16 +419,16 @@ export class TauriWebDriverDriver implements TauriDriver {
 
   private async createWebDriverSession(
     webdriverUrl: string,
-    applicationPath: string
+    applicationPath: string,
   ): Promise<string> {
     const body = {
       capabilities: {
         alwaysMatch: {
           "tauri:options": {
-            application: applicationPath
-          }
-        }
-      }
+            application: applicationPath,
+          },
+        },
+      },
     };
     const response = await webdriverHttpRequest<{
       readonly sessionId?: string;
@@ -455,7 +443,7 @@ export class TauriWebDriverDriver implements TauriDriver {
   private async findElement(
     managed: ManagedTauriApp,
     target: TauriActionTarget,
-    timeoutMs = 5000
+    timeoutMs = 5000,
   ): Promise<WebDriverElementRef> {
     if (!managed.webdriverSessionId) {
       throw new ProcessError("Tauri WebDriver session is not open.");
@@ -470,7 +458,7 @@ export class TauriWebDriverDriver implements TauriDriver {
           managed,
           "POST",
           `/session/${managed.webdriverSessionId}/element`,
-          locator
+          locator,
         );
         const elementId = value[W3C_ELEMENT_KEY] ?? value.ELEMENT;
         if (elementId) {
@@ -485,7 +473,7 @@ export class TauriWebDriverDriver implements TauriDriver {
     throw new ProcessError(
       `Tauri WebDriver locator did not match any elements: ${JSON.stringify(locator)}${
         lastError instanceof Error ? ` (${lastError.message})` : ""
-      }`
+      }`,
     );
   }
 
@@ -493,23 +481,20 @@ export class TauriWebDriverDriver implements TauriDriver {
     managed: ManagedTauriApp,
     method: string,
     path: string,
-    body?: unknown
+    body?: unknown,
   ): Promise<T> {
     if (!managed.webdriverUrl) {
       throw new ProcessError("Tauri WebDriver URL is not available.");
     }
-    return await webdriverHttpRequest<T>(
-      this.fetchLike,
-      managed.webdriverUrl,
-      method,
-      path,
-      body
-    );
+    return await webdriverHttpRequest<T>(this.fetchLike, managed.webdriverUrl, method, path, body);
   }
 }
 
 export async function reserveWebDriverPort(preferredPort?: number): Promise<number> {
-  if (preferredPort !== undefined && (!Number.isInteger(preferredPort) || preferredPort < 1 || preferredPort > 65535)) {
+  if (
+    preferredPort !== undefined &&
+    (!Number.isInteger(preferredPort) || preferredPort < 1 || preferredPort > 65535)
+  ) {
     throw new ProcessError(`Invalid WebDriver port: ${preferredPort}`);
   }
 
@@ -523,9 +508,8 @@ export async function reserveWebDriverPort(preferredPort?: number): Promise<numb
     });
   });
   const address = server.address();
-  const resolvedPort = typeof address === "object" && address !== null
-    ? address.port
-    : DEFAULT_WEBDRIVER_PORT;
+  const resolvedPort =
+    typeof address === "object" && address !== null ? address.port : DEFAULT_WEBDRIVER_PORT;
   await new Promise<void>((resolveClose, reject) => {
     server.close((error) => {
       if (error) {
@@ -545,7 +529,10 @@ function validateOpenOptions(options: TauriOpenOptions): void {
   if (options.timeoutMs !== undefined && options.timeoutMs <= 0) {
     throw new ProcessError("openTauriApp timeoutMs must be positive.");
   }
-  if (options.nativePort !== undefined && (!Number.isInteger(options.nativePort) || options.nativePort < 1 || options.nativePort > 65535)) {
+  if (
+    options.nativePort !== undefined &&
+    (!Number.isInteger(options.nativePort) || options.nativePort < 1 || options.nativePort > 65535)
+  ) {
     throw new ProcessError(`Invalid native port: ${options.nativePort}`);
   }
 }
@@ -561,13 +548,13 @@ function webdriverLocatorForTarget(target: TauriActionTarget): { using: string; 
     if (target.role === "button" && isNonEmpty(target.name)) {
       return {
         using: "xpath",
-        value: `//button[normalize-space(.)=${xpathLiteral(target.name)}] | //*[@role=${xpathLiteral(target.role)} and normalize-space(.)=${xpathLiteral(target.name)}]`
+        value: `//button[normalize-space(.)=${xpathLiteral(target.name)}] | //*[@role=${xpathLiteral(target.role)} and normalize-space(.)=${xpathLiteral(target.name)}]`,
       };
     }
     if (isNonEmpty(target.name)) {
       return {
         using: "xpath",
-        value: `//*[@role=${xpathLiteral(target.role)} and normalize-space(.)=${xpathLiteral(target.name)}]`
+        value: `//*[@role=${xpathLiteral(target.role)} and normalize-space(.)=${xpathLiteral(target.name)}]`,
       };
     }
     return { using: "xpath", value: `//*[@role=${xpathLiteral(target.role)}]` };
@@ -575,7 +562,7 @@ function webdriverLocatorForTarget(target: TauriActionTarget): { using: string; 
   if (isNonEmpty(target.label)) {
     return {
       using: "xpath",
-      value: `//*[@aria-label=${xpathLiteral(target.label)}] | //label[normalize-space(.)=${xpathLiteral(target.label)}]/following::input[1] | //label[normalize-space(.)=${xpathLiteral(target.label)}]/following::textarea[1]`
+      value: `//*[@aria-label=${xpathLiteral(target.label)}] | //label[normalize-space(.)=${xpathLiteral(target.label)}]/following::input[1] | //label[normalize-space(.)=${xpathLiteral(target.label)}]/following::textarea[1]`,
     };
   }
   if (isNonEmpty(target.placeholder)) {
@@ -584,11 +571,13 @@ function webdriverLocatorForTarget(target: TauriActionTarget): { using: string; 
   if (isNonEmpty(target.text)) {
     return {
       using: "xpath",
-      value: `//*[normalize-space(.)=${xpathLiteral(target.text)}]`
+      value: `//*[normalize-space(.)=${xpathLiteral(target.text)}]`,
     };
   }
 
-  throw new ProcessError("Tauri action requires selector, testId, role, label, placeholder, or text.");
+  throw new ProcessError(
+    "Tauri action requires selector, testId, role, label, placeholder, or text.",
+  );
 }
 
 async function webdriverHttpRequest<T>(
@@ -596,17 +585,20 @@ async function webdriverHttpRequest<T>(
   baseUrl: string,
   method: string,
   path: string,
-  body?: unknown
+  body?: unknown,
 ): Promise<T> {
   const response = await fetchLike(`${baseUrl}${path}`, {
     method,
-    headers: body === undefined ? undefined : {
-      "content-type": "application/json"
-    },
-    body: body === undefined ? undefined : JSON.stringify(body)
+    headers:
+      body === undefined
+        ? undefined
+        : {
+            "content-type": "application/json",
+          },
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await response.text();
-  const parsed = text.length > 0 ? JSON.parse(text) as { value?: unknown } : {};
+  const parsed = text.length > 0 ? (JSON.parse(text) as { value?: unknown }) : {};
   if (!response.ok) {
     const value = parsed.value;
     const message =
@@ -621,7 +613,7 @@ async function webdriverHttpRequest<T>(
 async function waitForWebDriverStatus(
   webdriverUrl: string,
   fetchLike: typeof fetch,
-  timeoutMs: number
+  timeoutMs: number,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
@@ -637,7 +629,7 @@ async function waitForWebDriverStatus(
   throw new ProcessError(
     `tauri-driver did not become ready within ${timeoutMs}ms${
       lastError instanceof Error ? `: ${lastError.message}` : ""
-    }`
+    }`,
   );
 }
 
@@ -645,7 +637,7 @@ function successResult(
   session: DesktopSession,
   app: ManagedTauriApp,
   actionType: string,
-  details: Readonly<Record<string, unknown>>
+  details: Readonly<Record<string, unknown>>,
 ): TauriActionResult {
   return {
     sessionId: session.id,
@@ -655,7 +647,7 @@ function successResult(
     mode: app.mode,
     createdAt: isoNow(),
     details: compactDetails(details),
-    warnings: app.warnings
+    warnings: app.warnings,
   };
 }
 
@@ -663,7 +655,7 @@ function unavailableResult(
   session: DesktopSession,
   app: ManagedTauriApp,
   actionType: string,
-  details: Readonly<Record<string, unknown>>
+  details: Readonly<Record<string, unknown>>,
 ): TauriActionResult {
   return {
     sessionId: session.id,
@@ -675,9 +667,9 @@ function unavailableResult(
     details: compactDetails({
       ...details,
       unavailable: true,
-      guidance: "Tauri WebDriver semantic mode is unavailable; use desktop_* X11 fallback tools."
+      guidance: "Tauri WebDriver semantic mode is unavailable; use desktop_* X11 fallback tools.",
     }),
-    warnings: app.warnings
+    warnings: app.warnings,
   };
 }
 
@@ -689,16 +681,14 @@ function targetDetails(target: TauriActionTarget): Readonly<Record<string, unkno
     name: target.name,
     targetLabel: target.label,
     placeholder: target.placeholder,
-    testId: target.testId
+    testId: target.testId,
   });
 }
 
 function compactDetails(
-  details: Readonly<Record<string, unknown>>
+  details: Readonly<Record<string, unknown>>,
 ): Readonly<Record<string, unknown>> {
-  return Object.fromEntries(
-    Object.entries(details).filter(([, value]) => value !== undefined)
-  );
+  return Object.fromEntries(Object.entries(details).filter(([, value]) => value !== undefined));
 }
 
 function isNonEmpty(value: string | undefined): value is string {
@@ -716,7 +706,10 @@ function xpathLiteral(value: string): string {
   if (!value.includes('"')) {
     return `"${value}"`;
   }
-  return `concat(${value.split("'").map((part) => `'${part}'`).join(', "\"\'\"", ')})`;
+  return `concat(${value
+    .split("'")
+    .map((part) => `'${part}'`)
+    .join(', ""\'"", ')})`;
 }
 
 function truncateForLog(value: string): string {

@@ -2,10 +2,10 @@ import type {
   DesktopSession,
   FocusWindowTarget,
   WindowActionResult,
-  WindowInfo
+  WindowInfo,
 } from "../types.js";
-import { WmctrlWindowBackend } from "./WmctrlWindowBackend.js";
 import type { WindowBackend } from "./types.js";
+import { WmctrlWindowBackend } from "./WmctrlWindowBackend.js";
 
 export interface WindowServiceOptions {
   readonly backend?: WindowBackend;
@@ -24,7 +24,7 @@ export class WindowService implements WindowBackend {
 
   async focusWindow(
     session: DesktopSession,
-    target: FocusWindowTarget
+    target: FocusWindowTarget,
   ): Promise<WindowActionResult> {
     return await this.backend.focusWindow(session, target);
   }

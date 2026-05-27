@@ -1,6 +1,6 @@
+import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
-import type { ChildProcess } from "node:child_process";
 import type { DoctorReport } from "./doctor.js";
 import { runDoctor } from "./doctor.js";
 import { runProcess, stopChildProcess } from "./processUtils.js";
@@ -36,35 +36,31 @@ export interface SmokeMcpOptions {
 
 export async function runSmokeMcp(
   args: readonly string[],
-  options: SmokeMcpOptions = {}
+  options: SmokeMcpOptions = {},
 ): Promise<SmokeMcpResult> {
   const parsed = parseSmokeMcpArgs(args);
   const report =
-    options.doctorReport ??
-    (await (options.runDoctor ?? (async () => await runDoctor()))());
+    options.doctorReport ?? (await (options.runDoctor ?? (async () => await runDoctor()))());
   ensureSmokeReady(report, "xterm");
 
   const rootPath = repoRootPath();
   await runProcess("pnpm", ["--filter", "@agent-desktop-harness/mcp-server", "build"], {
     cwd: rootPath,
-    env: process.env
+    env: process.env,
   });
 
   const server = spawn(process.execPath, [join(rootPath, "packages/mcp-server/dist/index.js")], {
     cwd: rootPath,
     env: process.env,
     shell: false,
-    stdio: ["pipe", "pipe", "pipe"]
+    stdio: ["pipe", "pipe", "pipe"],
   });
   const client = new RawMcpClient(server);
 
   let sessionId: string | undefined;
   let stopped = false;
   let serverStopped = false;
-  let result: Omit<
-    SmokeMcpResult,
-    "cleanupSucceeded" | "stopped" | "serverStopped"
-  > | undefined;
+  let result: Omit<SmokeMcpResult, "cleanupSucceeded" | "stopped" | "serverStopped"> | undefined;
   let runError: unknown;
   let cleanupError: unknown;
 
@@ -80,7 +76,7 @@ export async function runSmokeMcp(
       "desktop_focus_window",
       "desktop_click",
       "desktop_type_text",
-      "desktop_stop_session"
+      "desktop_stop_session",
     ]);
 
     const session = await client.callTool<SessionToolResult>("desktop_start_session", {
@@ -89,8 +85,8 @@ export async function runSmokeMcp(
       height: 900,
       depth: 24,
       policy: {
-        allowedCommands: ["xterm"]
-      }
+        allowedCommands: ["xterm"],
+      },
     });
     sessionId = session.id;
 
@@ -99,7 +95,7 @@ export async function runSmokeMcp(
       command: "xterm",
       args: [],
       cwd: parsed.workspacePath,
-      label: "mcp-smoke-xterm"
+      label: "mcp-smoke-xterm",
     });
     const stableScreen = await client.callTool<WaitForStableScreenToolResult>(
       "desktop_wait_for_stable_screen",
@@ -111,54 +107,47 @@ export async function runSmokeMcp(
         label: "mcp-smoke-stable",
         mode: "tolerant",
         fileSizeToleranceBytes: 2048,
-        retainOnlyLast: true
-      }
+        retainOnlyLast: true,
+      },
     );
-    const initialScreenshot = await client.callTool<ScreenshotToolResult>(
-      "desktop_screenshot",
-      {
-        sessionId,
-        label: "mcp-smoke-initial"
-      }
-    );
+    const initialScreenshot = await client.callTool<ScreenshotToolResult>("desktop_screenshot", {
+      sessionId,
+      label: "mcp-smoke-initial",
+    });
     const targetWindow = await client.callTool<WindowInfo>("desktop_wait_for_window", {
       sessionId,
       excludeDevtools: true,
       preferLargest: true,
-      timeoutMs: 5000
+      timeoutMs: 5000,
     });
 
     await client.callTool("desktop_focus_window", {
       sessionId,
-      id: targetWindow.id
+      id: targetWindow.id,
     });
     await client.callTool("desktop_click", {
       sessionId,
       x: 100,
       y: 100,
       button: "left",
-      label: "mcp-smoke-click"
+      label: "mcp-smoke-click",
     });
     await client.callTool("desktop_type_text", {
       sessionId,
       text: parsed.text,
-      label: "mcp-smoke-type"
+      label: "mcp-smoke-type",
     });
-    const afterTypeScreenshot = await client.callTool<ScreenshotToolResult>(
-      "desktop_screenshot",
-      {
-        sessionId,
-        label: "mcp-smoke-after-type"
-      }
-    );
+    const afterTypeScreenshot = await client.callTool<ScreenshotToolResult>("desktop_screenshot", {
+      sessionId,
+      label: "mcp-smoke-after-type",
+    });
 
     await client.callTool("desktop_stop_session", { sessionId });
     stopped = true;
 
-    const report = await client.callTool<EvidenceReportToolResult>(
-      "desktop_get_evidence_report",
-      { sessionId }
-    );
+    const report = await client.callTool<EvidenceReportToolResult>("desktop_get_evidence_report", {
+      sessionId,
+    });
 
     result = {
       sessionId,
@@ -168,9 +157,9 @@ export async function runSmokeMcp(
         stable: stableScreen.stable,
         checks: stableScreen.checks,
         elapsedMs: stableScreen.elapsedMs,
-        lastScreenshotPath: stableScreen.lastScreenshot?.path
+        lastScreenshotPath: stableScreen.lastScreenshot?.path,
       },
-      reportPath: report.path
+      reportPath: report.path,
     };
   } catch (error) {
     runError = error;
@@ -206,7 +195,7 @@ export async function runSmokeMcp(
     ...result,
     cleanupSucceeded: stopped && serverStopped,
     stopped,
-    serverStopped
+    serverStopped,
   };
 }
 
@@ -234,7 +223,7 @@ export function parseSmokeMcpArgs(args: readonly string[]): SmokeMcpArgs {
 
   return {
     workspacePath,
-    text
+    text,
   };
 }
 
@@ -253,8 +242,9 @@ export function parseMcpToolTextResult(result: unknown): unknown {
 
   const content = Array.isArray(result.content) ? result.content : [];
   const textItems = content
-    .filter((item): item is { readonly text: string } =>
-      isRecord(item) && item.type === "text" && typeof item.text === "string"
+    .filter(
+      (item): item is { readonly text: string } =>
+        isRecord(item) && item.type === "text" && typeof item.text === "string",
     )
     .map((item) => item.text);
 
@@ -299,11 +289,11 @@ export class RawMcpClient {
         new Error(
           [
             `MCP smoke server exited (code=${String(code)}, signal=${String(signal)}).`,
-            this.stderr.trim() ? `stderr:\n${this.stderr.trim()}` : undefined
+            this.stderr.trim() ? `stderr:\n${this.stderr.trim()}` : undefined,
           ]
             .filter(Boolean)
-            .join("\n")
-        )
+            .join("\n"),
+        ),
       );
     });
     child.once("error", (error) => {
@@ -317,8 +307,8 @@ export class RawMcpClient {
       capabilities: {},
       clientInfo: {
         name: "agent-desktop-harness-smoke",
-        version: "0.0.0"
-      }
+        version: "0.0.0",
+      },
     });
     await this.notify("notifications/initialized");
   }
@@ -328,10 +318,11 @@ export class RawMcpClient {
     const tools = isRecord(result) && Array.isArray(result.tools) ? result.tools : [];
     const available = new Set(
       tools
-        .filter((tool): tool is { readonly name: string } =>
-          isRecord(tool) && typeof tool.name === "string"
+        .filter(
+          (tool): tool is { readonly name: string } =>
+            isRecord(tool) && typeof tool.name === "string",
         )
-        .map((tool) => tool.name)
+        .map((tool) => tool.name),
     );
     const missing = names.filter((name) => !available.has(name));
     if (missing.length > 0) {
@@ -339,13 +330,10 @@ export class RawMcpClient {
     }
   }
 
-  async callTool<T = unknown>(
-    name: string,
-    args: Readonly<Record<string, unknown>>
-  ): Promise<T> {
+  async callTool<T = unknown>(name: string, args: Readonly<Record<string, unknown>>): Promise<T> {
     const result = await this.request("tools/call", {
       name,
-      arguments: args
+      arguments: args,
     });
     return parseMcpToolTextResult(result) as T;
   }
@@ -353,7 +341,7 @@ export class RawMcpClient {
   async request(
     method: string,
     params: Readonly<Record<string, unknown>>,
-    timeoutMs = 60_000
+    timeoutMs = 60_000,
   ): Promise<unknown> {
     const id = this.nextId;
     this.nextId += 1;
@@ -370,20 +358,17 @@ export class RawMcpClient {
       jsonrpc: "2.0",
       id,
       method,
-      params
+      params,
     });
 
     return await response;
   }
 
-  async notify(
-    method: string,
-    params?: Readonly<Record<string, unknown>>
-  ): Promise<void> {
+  async notify(method: string, params?: Readonly<Record<string, unknown>>): Promise<void> {
     await this.writeMessage({
       jsonrpc: "2.0",
       method,
-      params
+      params,
     });
   }
 
@@ -428,8 +413,8 @@ export class RawMcpClient {
           new Error(
             `MCP stdout contained invalid protocol data: ${
               error instanceof Error ? error.message : String(error)
-            }`
-          )
+            }`,
+          ),
         );
       }
     }
@@ -452,8 +437,8 @@ export class RawMcpClient {
         new Error(
           isRecord(message.error) && typeof message.error.message === "string"
             ? message.error.message
-            : "MCP request failed."
-        )
+            : "MCP request failed.",
+        ),
       );
       return;
     }
@@ -473,13 +458,13 @@ export class RawMcpClient {
 export async function waitForMcpWindows(
   client: RawMcpClient,
   sessionId: string,
-  timeoutMs = 5000
+  timeoutMs = 5000,
 ): Promise<WindowInfo[]> {
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
     const response = await client.callTool<WindowsToolResult>("desktop_get_windows", {
-      sessionId
+      sessionId,
     });
     if (response.windows.length > 0) {
       return response.windows;
@@ -490,11 +475,7 @@ export async function waitForMcpWindows(
   throw new Error(`No windows appeared within ${timeoutMs}ms during smoke-mcp.`);
 }
 
-function requireValue(
-  args: readonly string[],
-  index: number,
-  optionName: string
-): string {
+function requireValue(args: readonly string[], index: number, optionName: string): string {
   const value = args[index + 1];
   if (!value) {
     throw new Error(`${optionName} requires a value.`);

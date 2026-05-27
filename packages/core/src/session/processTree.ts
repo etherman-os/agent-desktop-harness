@@ -8,7 +8,7 @@ export interface TerminateOptions {
 
 export async function terminateProcessTree(
   child: ChildProcess | undefined,
-  options: TerminateOptions = {}
+  options: TerminateOptions = {},
 ): Promise<void> {
   if (!child || child.pid === undefined || hasExited(child)) {
     return;

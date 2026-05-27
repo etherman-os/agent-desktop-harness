@@ -1,9 +1,13 @@
-import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
-import { SessionManager } from "@agent-desktop-harness/core";
+import { spawn } from "node:child_process";
 import type { TauriDriverStatus } from "@agent-desktop-harness/core";
+import { SessionManager } from "@agent-desktop-harness/core";
 import type { DoctorReport } from "./doctor.js";
-import { formatMissingRequiredMessage, getMissingRequiredDependencies, runDoctor } from "./doctor.js";
+import {
+  formatMissingRequiredMessage,
+  getMissingRequiredDependencies,
+  runDoctor,
+} from "./doctor.js";
 import { collectChildOutput } from "./processUtils.js";
 import { defaultWorkspacePath } from "./workspace.js";
 
@@ -48,13 +52,12 @@ export interface SmokeTauriDriverOptions {
 
 export async function runSmokeTauriDriver(
   args: readonly string[],
-  options: SmokeTauriDriverOptions = {}
+  options: SmokeTauriDriverOptions = {},
 ): Promise<SmokeTauriDriverResult> {
   const env = options.env ?? process.env;
   const parsed = parseSmokeTauriDriverArgs(args, env);
   const report =
-    options.doctorReport ??
-    (await (options.runDoctor ?? (async () => await runDoctor()))());
+    options.doctorReport ?? (await (options.runDoctor ?? (async () => await runDoctor()))());
   ensureTauriDriverSmokeReady(report);
 
   const manager = options.sessionManager ?? new SessionManager();
@@ -62,13 +65,13 @@ export async function runSmokeTauriDriver(
   if (!parsed.command) {
     return skippedResult(
       status,
-      "No Tauri app configured. Set AGENT_DESKTOP_HARNESS_TAURI_COMMAND and AGENT_DESKTOP_HARNESS_TAURI_CWD."
+      "No Tauri app configured. Set AGENT_DESKTOP_HARNESS_TAURI_COMMAND and AGENT_DESKTOP_HARNESS_TAURI_CWD.",
     );
   }
   if (!status.available) {
     return skippedResult(
       status,
-      "Tauri WebDriver prerequisites are unavailable; install tauri-driver and the native WebDriver backend before running this semantic smoke."
+      "Tauri WebDriver prerequisites are unavailable; install tauri-driver and the native WebDriver backend before running this semantic smoke.",
     );
   }
 
@@ -81,7 +84,7 @@ export async function runSmokeTauriDriver(
     if (parsed.prelaunchCommand) {
       prelaunchProcess = startPrelaunchProcess(
         parsed.prelaunchCommand,
-        parsed.prelaunchCwd ?? parsed.cwd ?? parsed.workspacePath
+        parsed.prelaunchCwd ?? parsed.cwd ?? parsed.workspacePath,
       );
       const prelaunchOutput = collectChildOutput(prelaunchProcess);
       if (parsed.prelaunchWaitUrl) {
@@ -89,7 +92,7 @@ export async function runSmokeTauriDriver(
           parsed.prelaunchWaitUrl,
           prelaunchProcess,
           prelaunchOutput,
-          parsed.prelaunchTimeoutMs
+          parsed.prelaunchTimeoutMs,
         );
       } else {
         await delay(Math.min(parsed.prelaunchTimeoutMs, 1000));
@@ -107,8 +110,8 @@ export async function runSmokeTauriDriver(
     const session = await manager.createSession({
       workspacePath: parsed.workspacePath,
       policy: {
-        allowedCommands: [command]
-      }
+        allowedCommands: [command],
+      },
     });
     sessionId = session.id;
 
@@ -120,7 +123,7 @@ export async function runSmokeTauriDriver(
       webdriverPort: parsed.webdriverPort,
       timeoutMs: parsed.timeoutMs,
       windowTitleIncludes: parsed.windowTitleIncludes,
-      label: "tauri-driver-smoke"
+      label: "tauri-driver-smoke",
     });
 
     if (app.mode === "x11-fallback") {
@@ -129,7 +132,7 @@ export async function runSmokeTauriDriver(
         excludeDevtools: true,
         preferLargest: true,
         timeoutMs: parsed.timeoutMs,
-        intervalMs: 500
+        intervalMs: 500,
       });
     }
 
@@ -139,14 +142,14 @@ export async function runSmokeTauriDriver(
         appId: app.appId,
         text: parsed.assertText,
         timeoutMs: parsed.timeoutMs,
-        label: "tauri-driver-smoke-assert"
+        label: "tauri-driver-smoke-assert",
       });
       semanticAsserted = assertResult.success;
     }
 
     const screenshot = await manager.tauriScreenshot(session.id, {
       appId: app.appId,
-      label: "tauri-driver-smoke"
+      label: "tauri-driver-smoke",
     });
     await manager.stopSession(session.id);
     stopped = true;
@@ -163,7 +166,7 @@ export async function runSmokeTauriDriver(
       screenshotPath: screenshot.path,
       semanticAsserted,
       cleanupSucceeded: true,
-      stopped
+      stopped,
     };
   } finally {
     if (sessionId && !stopped) {
@@ -181,15 +184,15 @@ export async function runSmokeTauriDriver(
         cleanupError = cleanupError ?? error;
       }
     }
-    if (cleanupError) {
-      throw cleanupError;
-    }
+  }
+  if (cleanupError) {
+    throw cleanupError;
   }
 }
 
 export function parseSmokeTauriDriverArgs(
   args: readonly string[],
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
 ): SmokeTauriDriverArgs {
   let workspacePath = env.AGENT_DESKTOP_HARNESS_TAURI_CWD ?? defaultWorkspacePath();
   let command = env.AGENT_DESKTOP_HARNESS_TAURI_COMMAND
@@ -197,8 +200,7 @@ export function parseSmokeTauriDriverArgs(
     : undefined;
   let cwd = env.AGENT_DESKTOP_HARNESS_TAURI_CWD;
   let applicationPath =
-    env.AGENT_DESKTOP_HARNESS_TAURI_APP_PATH ??
-    env.AGENT_DESKTOP_HARNESS_TAURI_APPLICATION;
+    env.AGENT_DESKTOP_HARNESS_TAURI_APP_PATH ?? env.AGENT_DESKTOP_HARNESS_TAURI_APPLICATION;
   let prelaunchCommand = env.AGENT_DESKTOP_HARNESS_TAURI_PRELAUNCH_COMMAND
     ? parseCommandLine(env.AGENT_DESKTOP_HARNESS_TAURI_PRELAUNCH_COMMAND)
     : undefined;
@@ -207,7 +209,7 @@ export function parseSmokeTauriDriverArgs(
   let prelaunchTimeoutMs = env.AGENT_DESKTOP_HARNESS_TAURI_PRELAUNCH_TIMEOUT_MS
     ? parsePositiveInteger(
         env.AGENT_DESKTOP_HARNESS_TAURI_PRELAUNCH_TIMEOUT_MS,
-        "prelaunch timeout"
+        "prelaunch timeout",
       )
     : 10_000;
   let windowTitleIncludes = env.AGENT_DESKTOP_HARNESS_TAURI_WINDOW_TITLE;
@@ -268,7 +270,7 @@ export function parseSmokeTauriDriverArgs(
     if (arg === "--prelaunch-timeout-ms") {
       prelaunchTimeoutMs = parsePositiveInteger(
         requireValue(args, index, "--prelaunch-timeout-ms"),
-        "prelaunch timeout"
+        "prelaunch timeout",
       );
       index += 1;
       continue;
@@ -313,7 +315,7 @@ export function parseSmokeTauriDriverArgs(
     windowTitleIncludes,
     webdriverPort,
     assertText,
-    timeoutMs
+    timeoutMs,
   };
 }
 
@@ -379,7 +381,7 @@ function skippedResult(status: TauriDriverStatus, reason: string): SmokeTauriDri
     reason,
     status,
     cleanupSucceeded: true,
-    stopped: true
+    stopped: true,
   };
 }
 
@@ -394,7 +396,7 @@ function startPrelaunchProcess(command: readonly string[], cwd: string): ChildPr
     env: process.env,
     shell: false,
     detached: true,
-    stdio: ["ignore", "pipe", "pipe"]
+    stdio: ["ignore", "pipe", "pipe"],
   });
 }
 
@@ -402,7 +404,7 @@ async function waitForPrelaunchUrl(
   url: string,
   child: ChildProcess,
   output: { readonly stdout: string; readonly stderr: string },
-  timeoutMs: number
+  timeoutMs: number,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
@@ -428,7 +430,7 @@ async function waitForPrelaunchUrl(
   throw new Error(
     `Tauri prelaunch command did not become ready at ${url} within ${timeoutMs}ms: ${
       lastError instanceof Error ? lastError.message : String(lastError)
-    }`
+    }`,
   );
 }
 
@@ -466,7 +468,7 @@ function formatPrelaunchExitedMessage(output: {
   return [
     "Tauri prelaunch command exited before it became ready.",
     output.stderr.trim() ? `stderr:\n${output.stderr.trim()}` : undefined,
-    output.stdout.trim() ? `stdout:\n${output.stdout.trim()}` : undefined
+    output.stdout.trim() ? `stdout:\n${output.stdout.trim()}` : undefined,
   ]
     .filter(Boolean)
     .join("\n");
@@ -506,11 +508,7 @@ function isNoSuchProcessError(error: unknown): boolean {
   );
 }
 
-function requireValue(
-  args: readonly string[],
-  index: number,
-  optionName: string
-): string {
+function requireValue(args: readonly string[], index: number, optionName: string): string {
   const value = args[index + 1];
   if (!value) {
     throw new Error(`${optionName} requires a value.`);

@@ -1,10 +1,10 @@
-import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
+import { createServer } from "node:http";
 import { URL } from "node:url";
 import { SessionManager } from "@agent-desktop-harness/core";
-import { DesktopHttpApi } from "./api.js";
 import type { SessionManagerLike } from "./api.js";
-import { HttpError, errorToHttpResponse } from "./errors.js";
+import { DesktopHttpApi } from "./api.js";
+import { errorToHttpResponse, HttpError } from "./errors.js";
 
 export interface CreateHttpServerOptions {
   readonly sessionManager?: SessionManagerLike;
@@ -16,13 +16,8 @@ export interface StartHttpServerOptions extends CreateHttpServerOptions {
   readonly port?: number;
 }
 
-export function createDesktopHarnessHttpServer(
-  options: CreateHttpServerOptions = {}
-): Server {
-  const api = new DesktopHttpApi(
-    options.sessionManager,
-    options.defaultWorkspaceDir
-  );
+export function createDesktopHarnessHttpServer(options: CreateHttpServerOptions = {}): Server {
+  const api = new DesktopHttpApi(options.sessionManager, options.defaultWorkspaceDir);
 
   return createServer(async (request, response) => {
     try {
@@ -38,15 +33,15 @@ export function createDesktopHarnessHttpServer(
   });
 }
 
-export async function startHttpServer(
-  options: StartHttpServerOptions = {}
-): Promise<Server> {
-  const host = options.host ?? process.env.AGENT_DESKTOP_HARNESS_HOST ?? "127.0.0.1";
+export async function startHttpServer(options: StartHttpServerOptions = {}): Promise<Server> {
+  const requestedHost = options.host ?? process.env.AGENT_DESKTOP_HARNESS_HOST ?? "127.0.0.1";
+  assertLoopbackHost(requestedHost);
+  const host = normalizeLoopbackHost(requestedHost);
   const port = options.port ?? parsePort(process.env.AGENT_DESKTOP_HARNESS_PORT) ?? 7341;
   const sessionManager = options.sessionManager ?? new SessionManager();
   const server = createDesktopHarnessHttpServer({
     ...options,
-    sessionManager
+    sessionManager,
   });
 
   installShutdownHandlers(server, sessionManager);
@@ -63,10 +58,29 @@ export async function startHttpServer(
   return server;
 }
 
-async function routeRequest(
-  request: IncomingMessage,
-  api: DesktopHttpApi
-): Promise<RouteResult> {
+export function isLoopbackHost(host: string): boolean {
+  const normalized = normalizeLoopbackHost(host);
+  return normalized === "127.0.0.1" || normalized === "localhost" || normalized === "::1";
+}
+
+function normalizeLoopbackHost(host: string): string {
+  return host
+    .trim()
+    .toLowerCase()
+    .replace(/^\[(.*)\]$/, "$1");
+}
+
+function assertLoopbackHost(host: string): void {
+  if (!isLoopbackHost(host)) {
+    throw new HttpError(
+      400,
+      "INVALID_HOST",
+      `HTTP server host must be loopback-only. Refusing to bind to ${host}.`,
+    );
+  }
+}
+
+async function routeRequest(request: IncomingMessage, api: DesktopHttpApi): Promise<RouteResult> {
   const method = request.method ?? "GET";
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
@@ -290,14 +304,19 @@ async function routeRequest(
     return ok(await api.listVisualBaselines(sessionId, Object.fromEntries(url.searchParams)));
   }
 
-  if (method === "GET" && parts.length === 4 && parts[2] === "visual" && parts[3] === "assertions") {
+  if (
+    method === "GET" &&
+    parts.length === 4 &&
+    parts[2] === "visual" &&
+    parts[3] === "assertions"
+  ) {
     return ok(await api.listVisualAssertions(sessionId));
   }
 
   if (method === "GET" && parts.length === 5 && parts[2] === "visual" && parts[3] === "diffs") {
     const file = await api.getVisualDiffFile(sessionId, parts[4] ?? "");
     return binary(200, file.body, "image/png", {
-      "content-disposition": `inline; filename="${safeHeaderFileName(parts[4] ?? "visual-diff.png")}"`
+      "content-disposition": `inline; filename="${safeHeaderFileName(parts[4] ?? "visual-diff.png")}"`,
     });
   }
 
@@ -312,7 +331,7 @@ async function routeRequest(
   if (method === "GET" && parts.length === 4 && parts[2] === "screenshots") {
     const file = await api.getScreenshotFile(sessionId, parts[3] ?? "");
     return binary(200, file.body, "image/png", {
-      "content-disposition": `inline; filename="${safeHeaderFileName(parts[3] ?? "screenshot.png")}"`
+      "content-disposition": `inline; filename="${safeHeaderFileName(parts[3] ?? "screenshot.png")}"`,
     });
   }
 
@@ -323,7 +342,7 @@ async function routeRequest(
   if (method === "GET" && parts.length === 4 && parts[2] === "annotations") {
     const file = await api.getAnnotationFile(sessionId, parts[3] ?? "");
     return binary(200, file.body, "image/png", {
-      "content-disposition": `inline; filename="${safeHeaderFileName(parts[3] ?? "annotation.png")}"`
+      "content-disposition": `inline; filename="${safeHeaderFileName(parts[3] ?? "annotation.png")}"`,
     });
   }
 
@@ -332,15 +351,14 @@ async function routeRequest(
   }
 
   if (method === "GET" && parts.length === 3 && parts[2] === "annotate") {
-    return text(200, api.getAnnotationUi(sessionId, url.searchParams.get("screenshot") ?? undefined), "text/html; charset=utf-8");
+    return text(
+      200,
+      api.getAnnotationUi(sessionId, url.searchParams.get("screenshot") ?? undefined),
+      "text/html; charset=utf-8",
+    );
   }
 
-  if (
-    method === "GET" &&
-    parts.length === 4 &&
-    parts[2] === "evidence" &&
-    parts[3] === "report"
-  ) {
+  if (method === "GET" && parts.length === 4 && parts[2] === "evidence" && parts[3] === "report") {
     return ok(await api.getEvidenceReport(sessionId));
   }
 
@@ -353,7 +371,7 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
     throw new HttpError(
       400,
       "INVALID_CONTENT_TYPE",
-      "POST requests must use Content-Type: application/json."
+      "POST requests must use Content-Type: application/json.",
     );
   }
 
@@ -405,7 +423,7 @@ function ok(body: unknown): RouteResult {
   return {
     kind: "json",
     statusCode: 200,
-    body
+    body,
   };
 }
 
@@ -413,14 +431,14 @@ function binary(
   statusCode: number,
   body: Buffer,
   contentType: string,
-  headers: Readonly<Record<string, string>> = {}
+  headers: Readonly<Record<string, string>> = {},
 ): RouteResult {
   return {
     kind: "binary",
     statusCode,
     body,
     contentType,
-    headers
+    headers,
   };
 }
 
@@ -428,14 +446,14 @@ function text(
   statusCode: number,
   body: string,
   contentType: string,
-  headers: Readonly<Record<string, string>> = {}
+  headers: Readonly<Record<string, string>> = {},
 ): RouteResult {
   return {
     kind: "text",
     statusCode,
     body,
     contentType,
-    headers
+    headers,
   };
 }
 
@@ -448,7 +466,7 @@ function writeRouteResult(response: ServerResponse, result: RouteResult): void {
   response.writeHead(result.statusCode, {
     "content-type": result.contentType,
     "cache-control": "no-store",
-    ...(result.headers ?? {})
+    ...(result.headers ?? {}),
   });
   response.end(result.body);
 }
@@ -456,7 +474,7 @@ function writeRouteResult(response: ServerResponse, result: RouteResult): void {
 function writeJson(response: ServerResponse, statusCode: number, body: unknown): void {
   response.writeHead(statusCode, {
     "content-type": "application/json; charset=utf-8",
-    "cache-control": "no-store"
+    "cache-control": "no-store",
   });
   response.end(`${JSON.stringify(body)}\n`);
 }
@@ -493,7 +511,7 @@ function installShutdownHandlers(server: Server, sessionManager: SessionManagerL
         sessionManager
           .listSessions()
           .filter((session) => session.status !== "stopped")
-          .map((session) => sessionManager.stopSession(session.id))
+          .map((session) => sessionManager.stopSession(session.id)),
       );
       server.close(() => process.exit(0));
     })();

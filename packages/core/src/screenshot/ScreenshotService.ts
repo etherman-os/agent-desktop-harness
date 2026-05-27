@@ -1,6 +1,10 @@
-import type { DesktopSession, ScreenshotOptions, ScreenshotResult } from "../types.js";
 import { MissingDependencyError, ProcessError } from "../errors.js";
-import { assertExecutableOnPath, createSanitizedEnvironment, runCommand } from "../utils/command.js";
+import type { DesktopSession, ScreenshotOptions, ScreenshotResult } from "../types.js";
+import {
+  assertExecutableOnPath,
+  createSanitizedEnvironment,
+  runCommand,
+} from "../utils/command.js";
 import { fileSize } from "../utils/fs.js";
 import { now } from "../utils/time.js";
 
@@ -9,16 +13,13 @@ export class ScreenshotService {
     session: DesktopSession,
     filePath: string,
     sequence: number,
-    options: ScreenshotOptions = {}
+    options: ScreenshotOptions = {},
   ): Promise<ScreenshotResult> {
-    await assertExecutableOnPath(
-      "scrot",
-      "Install scrot, for example: sudo apt install -y scrot"
-    );
+    await assertExecutableOnPath("scrot", "Install scrot, for example: sudo apt install -y scrot");
 
     try {
       await runCommand("scrot", [filePath], {
-        env: createSanitizedEnvironment({ DISPLAY: session.display })
+        env: createSanitizedEnvironment({ DISPLAY: session.display }),
       });
     } catch (error) {
       if (error instanceof MissingDependencyError) {
@@ -29,7 +30,7 @@ export class ScreenshotService {
         `Failed to capture screenshot from display ${session.display}: ${
           error instanceof Error ? error.message : String(error)
         }`,
-        error
+        error,
       );
     }
 
@@ -49,7 +50,7 @@ export class ScreenshotService {
       createdAt,
       display: session.display,
       sequence,
-      label: options.label
+      label: options.label,
     };
   }
 }

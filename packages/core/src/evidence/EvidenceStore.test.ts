@@ -1,10 +1,10 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
 import type { DesktopSession } from "../types.js";
-import { EvidenceStore, assertSafePngFileName, parsePngBase64 } from "./EvidenceStore.js";
+import { assertSafePngFileName, EvidenceStore, parsePngBase64 } from "./EvidenceStore.js";
 
 const tinyPngDataUrl =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADgwGZVfZtNwAAAABJRU5ErkJggg==";
@@ -15,7 +15,7 @@ test("EvidenceStore creates session files and appends action logs", async () => 
   const session: DesktopSession = {
     id: "session-test",
     config: {
-      workspacePath: tempRoot
+      workspacePath: tempRoot,
     },
     driverKind: "unknown",
     status: "running",
@@ -29,9 +29,9 @@ test("EvidenceStore creates session files and appends action logs", async () => 
     depth: 24,
     processIds: {
       xvfb: 123,
-      apps: []
+      apps: [],
     },
-    warnings: []
+    warnings: [],
   };
 
   try {
@@ -42,8 +42,8 @@ test("EvidenceStore creates session files and appends action logs", async () => 
       type: "session.created",
       status: "ok",
       details: {
-        display: session.display
-      }
+        display: session.display,
+      },
     });
 
     const paths = store.getPaths(tempRoot, session.id);
@@ -55,7 +55,7 @@ test("EvidenceStore creates session files and appends action logs", async () => 
     assert.equal(JSON.parse(firstLine).type, "session.created");
 
     const screenshotPath = store.getScreenshotPath(session, 1, {
-      label: "Initial State"
+      label: "Initial State",
     });
     assert.equal(screenshotPath.endsWith("0001-initial-state.png"), true);
   } finally {
@@ -81,8 +81,8 @@ test("EvidenceStore lists screenshots and creates visual annotations", async () 
       details: {
         path: screenshotPath,
         sequence: 1,
-        label: "game-bug"
-      }
+        label: "game-bug",
+      },
     });
 
     const screenshots = await store.listScreenshots(session);
@@ -99,7 +99,7 @@ test("EvidenceStore lists screenshots and creates visual annotations", async () 
       height: 40,
       note: "Player clips into this platform.",
       color: "#ff0000",
-      cropPngBase64: tinyPngDataUrl
+      cropPngBase64: tinyPngDataUrl,
     });
 
     assert.equal(annotation.id, "ann_001");
@@ -153,7 +153,7 @@ test("EvidenceStore appends visual assertions and includes them in reports", asy
       maxDiffPixelRatio: 0.01,
       passed: true,
       createdAt: "2026-01-01T00:00:00.000Z",
-      warnings: []
+      warnings: [],
     });
 
     const assertions = await store.listVisualAssertions(session);
@@ -174,16 +174,10 @@ test("EvidenceStore appends visual assertions and includes them in reports", asy
 test("EvidenceStore rejects traversal and invalid crop payloads", () => {
   assert.throws(
     () => assertSafePngFileName("../0001-bug.png", "screenshot file name"),
-    /Invalid screenshot file name/
+    /Invalid screenshot file name/,
   );
-  assert.throws(
-    () => parsePngBase64("data:text/plain;base64,SGVsbG8="),
-    /PNG data URL/
-  );
-  assert.throws(
-    () => parsePngBase64("SGVsbG8="),
-    /PNG image/
-  );
+  assert.throws(() => parsePngBase64("data:text/plain;base64,SGVsbG8="), /PNG data URL/);
+  assert.throws(() => parsePngBase64("SGVsbG8="), /PNG image/);
 });
 
 test("EvidenceStore rejects visual QA path traversal", async () => {
@@ -195,12 +189,9 @@ test("EvidenceStore rejects visual QA path traversal", async () => {
     await store.createSession(session);
     assert.throws(
       () => store.resolveEvidencePath(session, "../outside.png"),
-      /outside the session evidence directory/
+      /outside the session evidence directory/,
     );
-    assert.throws(
-      () => store.resolveEvidencePath(session, "screenshots/not-png.jpg"),
-      /PNG files/
-    );
+    assert.throws(() => store.resolveEvidencePath(session, "screenshots/not-png.jpg"), /PNG files/);
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
@@ -210,7 +201,7 @@ function makeSession(tempRoot: string, store: EvidenceStore): DesktopSession {
   return {
     id: "session-test",
     config: {
-      workspacePath: tempRoot
+      workspacePath: tempRoot,
     },
     driverKind: "unknown",
     status: "running",
@@ -224,8 +215,8 @@ function makeSession(tempRoot: string, store: EvidenceStore): DesktopSession {
     depth: 24,
     processIds: {
       xvfb: 123,
-      apps: []
+      apps: [],
     },
-    warnings: []
+    warnings: [],
   };
 }

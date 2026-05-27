@@ -4,7 +4,7 @@ import type {
   LiveObserverRef,
   LiveObserverStatus,
   StartLiveObserverOptions,
-  StopLiveObserverResult
+  StopLiveObserverResult,
 } from "./observerTypes.js";
 
 export class LiveObserverService {
@@ -16,7 +16,7 @@ export class LiveObserverService {
 
   async start(
     session: DesktopSession,
-    options: StartLiveObserverOptions = {}
+    options: StartLiveObserverOptions = {},
   ): Promise<LiveObserverRef> {
     return await this.observer.start(session, options);
   }
@@ -25,10 +25,7 @@ export class LiveObserverService {
     return this.observer.list(sessionId);
   }
 
-  async stop(
-    sessionId: SessionId,
-    observerId?: string
-  ): Promise<StopLiveObserverResult> {
+  async stop(sessionId: SessionId, observerId?: string): Promise<StopLiveObserverResult> {
     return await this.observer.stop(sessionId, observerId);
   }
 

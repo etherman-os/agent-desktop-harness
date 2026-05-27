@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { BinaryChecker } from "./browser.js";
 import {
   buildBrowserLaunchConfig,
   detectGuiBrowser,
-  formatMissingGuiBrowserMessage
+  formatMissingGuiBrowserMessage,
 } from "./browser.js";
-import type { BinaryChecker } from "./browser.js";
 
 test("detectGuiBrowser uses the first available browser by priority", async () => {
   const check: BinaryChecker = async (name) => ({
     found: name === "google-chrome-stable",
-    path: name === "google-chrome-stable" ? "/usr/bin/google-chrome-stable" : undefined
+    path: name === "google-chrome-stable" ? "/usr/bin/google-chrome-stable" : undefined,
   });
 
   const browser = await detectGuiBrowser({ check, env: {} });
@@ -23,14 +23,14 @@ test("detectGuiBrowser uses the first available browser by priority", async () =
 test("detectGuiBrowser honors AGENT_DESKTOP_HARNESS_BROWSER", async () => {
   const check: BinaryChecker = async (name) => ({
     found: name === "/usr/bin/firefox",
-    path: name === "/usr/bin/firefox" ? "/usr/bin/firefox" : undefined
+    path: name === "/usr/bin/firefox" ? "/usr/bin/firefox" : undefined,
   });
 
   const browser = await detectGuiBrowser({
     check,
     env: {
-      AGENT_DESKTOP_HARNESS_BROWSER: "/usr/bin/firefox"
-    }
+      AGENT_DESKTOP_HARNESS_BROWSER: "/usr/bin/firefox",
+    },
   });
 
   assert.equal(browser?.command, "/usr/bin/firefox");
@@ -46,10 +46,10 @@ test("detectGuiBrowser fails clearly for an invalid override", async () => {
       await detectGuiBrowser({
         check,
         env: {
-          AGENT_DESKTOP_HARNESS_BROWSER: "/missing/browser"
-        }
+          AGENT_DESKTOP_HARNESS_BROWSER: "/missing/browser",
+        },
       }),
-    /AGENT_DESKTOP_HARNESS_BROWSER is set but is not executable/
+    /AGENT_DESKTOP_HARNESS_BROWSER is set but is not executable/,
   );
 });
 
@@ -59,10 +59,10 @@ test("buildBrowserLaunchConfig creates chromium-safe args", () => {
       command: "chromium",
       path: "/usr/bin/chromium",
       kind: "chromium",
-      source: "path"
+      source: "path",
     },
     "/tmp/profile",
-    "http://127.0.0.1:5179"
+    "http://127.0.0.1:5179",
   );
 
   assert.equal(launch.command, "chromium");
@@ -78,10 +78,10 @@ test("buildBrowserLaunchConfig creates firefox profile args", () => {
       command: "firefox",
       path: "/usr/bin/firefox",
       kind: "firefox",
-      source: "path"
+      source: "path",
     },
     "/tmp/profile",
-    "http://127.0.0.1:5179"
+    "http://127.0.0.1:5179",
   );
 
   assert.equal(launch.command, "firefox");
@@ -89,7 +89,7 @@ test("buildBrowserLaunchConfig creates firefox profile args", () => {
     "--profile",
     "/tmp/profile",
     "--new-instance",
-    "--width"
+    "--width",
   ]);
   assert.equal(launch.args.at(-1), "http://127.0.0.1:5179");
 });

@@ -1,14 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type {
-  BrowserActionResult,
-  BrowserAssertTextOptions,
-  BrowserClickOptions,
-  BrowserFillOptions,
-  BrowserOpenOptions,
-  BrowserPageRef,
-  BrowserPressOptions,
-  BrowserScreenshotOptions,
+  AnnotationRegionOptions,
+  AnnotationRegionResult,
   AppActionResult,
   AppAssertTextOptions,
   AppClickOptions,
@@ -17,6 +11,15 @@ import type {
   AppPressOptions,
   AppRef,
   AppScreenshotOptions,
+  BrowserActionResult,
+  BrowserAssertTextOptions,
+  BrowserClickOptions,
+  BrowserFillOptions,
+  BrowserOpenOptions,
+  BrowserPageRef,
+  BrowserPressOptions,
+  BrowserScreenshotOptions,
+  CompareVisualBaselineOptions,
   CreateAnnotationInput,
   DesktopSession,
   DriverRouteDecision,
@@ -33,8 +36,10 @@ import type {
   ElectronScreenshotOptions,
   InputActionResult,
   LaunchResult,
+  ListVisualBaselinesOptions,
   LiveObserverRef,
   LiveObserverStatus,
+  SaveVisualBaselineOptions,
   ScreenshotAnnotation,
   ScreenshotArtifact,
   ScreenshotResult,
@@ -48,36 +53,25 @@ import type {
   TauriFillOptions,
   TauriOpenOptions,
   TauriScreenshotOptions,
-  AnnotationRegionOptions,
-  AnnotationRegionResult,
-  CompareVisualBaselineOptions,
-  ListVisualBaselinesOptions,
-  SaveVisualBaselineOptions,
   VisualAssertAnnotationChangedOptions,
   VisualAssertAnnotationSimilarOptions,
-  VisualAssertChangedOptions,
   VisualAssertChangeContainedOptions,
+  VisualAssertChangedOptions,
   VisualAssertSimilarOptions,
   VisualBaselineRef,
   VisualChangeContainmentResult,
   VisualCompareOptions,
   VisualCompareResult,
+  VisualHandoff,
   WaitForStableScreenResult,
   WaitForWindowOptions,
-  VisualHandoff,
   WindowActionResult,
-  WindowInfo
+  WindowInfo,
 } from "@agent-desktop-harness/core";
 import { SessionManager } from "@agent-desktop-harness/core";
+import { renderAnnotationUi } from "./annotationUi.js";
 import { HttpError } from "./errors.js";
 import {
-  browserAssertTextBodySchema,
-  browserClickBodySchema,
-  browserCloseBodySchema,
-  browserFillBodySchema,
-  browserOpenBodySchema,
-  browserPressBodySchema,
-  browserScreenshotBodySchema,
   appAssertTextBodySchema,
   appClickBodySchema,
   appCloseBodySchema,
@@ -85,8 +79,18 @@ import {
   appOpenBodySchema,
   appPressBodySchema,
   appScreenshotBodySchema,
+  browserAssertTextBodySchema,
+  browserClickBodySchema,
+  browserCloseBodySchema,
+  browserFillBodySchema,
+  browserOpenBodySchema,
+  browserPressBodySchema,
+  browserScreenshotBodySchema,
   clickBodySchema,
+  compareVisualBaselineBodySchema,
   createAnnotationBodySchema,
+  createSessionBodySchema,
+  driverRouteBodySchema,
   electronAssertTextBodySchema,
   electronClickBodySchema,
   electronCloseBodySchema,
@@ -94,15 +98,15 @@ import {
   electronOpenBodySchema,
   electronPressBodySchema,
   electronScreenshotBodySchema,
-  driverRouteBodySchema,
-  createSessionBodySchema,
   focusWindowBodySchema,
   hotkeyBodySchema,
   launchBodySchema,
+  listVisualBaselinesQuerySchema,
+  pngFileNameSchema,
+  saveVisualBaselineBodySchema,
   screenshotBodySchema,
   scrollBodySchema,
   sessionIdSchema,
-  pngFileNameSchema,
   startLiveObserverBodySchema,
   tauriAssertTextBodySchema,
   tauriClickBodySchema,
@@ -111,108 +115,131 @@ import {
   tauriOpenBodySchema,
   tauriScreenshotBodySchema,
   typeTextBodySchema,
-  waitForStableScreenBodySchema,
-  waitForWindowBodySchema,
-  compareVisualBaselineBodySchema,
-  listVisualBaselinesQuerySchema,
-  saveVisualBaselineBodySchema,
   visualAssertAnnotationChangedBodySchema,
   visualAssertAnnotationSimilarBodySchema,
-  visualAssertChangedBodySchema,
   visualAssertChangeContainedBodySchema,
+  visualAssertChangedBodySchema,
   visualAssertSimilarBodySchema,
-  visualCompareBodySchema
+  visualCompareBodySchema,
+  waitForStableScreenBodySchema,
+  waitForWindowBodySchema,
 } from "./schemas.js";
 import {
   redactErrorMessage,
   redactTypeTextResult,
-  serializeLaunchResult,
-  serializeScreenshotArtifact,
-  serializeScreenshot,
   serializeAnnotation,
-  serializeBrowserActionResult,
-  serializeBrowserPageRef,
   serializeAppActionResult,
   serializeAppRef,
+  serializeBrowserActionResult,
+  serializeBrowserPageRef,
   serializeDriverRouteDecision,
   serializeDriverRouterStatus,
   serializeElectronActionResult,
   serializeElectronAppRef,
   serializeElectronDriverStatus,
+  serializeLaunchResult,
   serializeLiveObserverRef,
   serializeLiveObserverStatus,
+  serializeScreenshot,
+  serializeScreenshotArtifact,
+  serializeSession,
   serializeTauriActionResult,
   serializeTauriAppRef,
   serializeTauriDriverStatus,
   serializeVisualBaseline,
-  serializeVisualHandoff,
-  serializeSession,
   serializeVisualCompareResult,
-  serializeWaitForStableScreenResult
+  serializeVisualHandoff,
+  serializeWaitForStableScreenResult,
 } from "./serializers.js";
-import { renderAnnotationUi } from "./annotationUi.js";
 
 export interface SessionManagerLike {
   createSession(config: SessionConfig): Promise<DesktopSession>;
   listSessions(): DesktopSession[];
   getSession(sessionId: SessionId): DesktopSession | undefined;
-  launchApp(sessionId: SessionId, launch: {
-    command: string;
-    args?: readonly string[];
-    cwd?: string;
-    env?: Readonly<Record<string, string>>;
-  }): Promise<LaunchResult>;
-  captureScreenshot(sessionId: SessionId, options?: {
-    label?: string;
-  }): Promise<ScreenshotResult>;
-  click(sessionId: SessionId, action: {
-    x: number;
-    y: number;
-    button?: "left" | "right" | "middle";
-    label?: string;
-  }): Promise<InputActionResult>;
-  doubleClick(sessionId: SessionId, action: {
-    x: number;
-    y: number;
-    button?: "left" | "right" | "middle";
-    label?: string;
-  }): Promise<InputActionResult>;
-  typeText(sessionId: SessionId, action: {
-    text: string;
-    secret?: boolean;
-    label?: string;
-  }): Promise<InputActionResult>;
-  hotkey(sessionId: SessionId, action: {
-    keys: readonly string[];
-    label?: string;
-  }): Promise<InputActionResult>;
-  scroll(sessionId: SessionId, action: {
-    direction: "up" | "down" | "left" | "right";
-    amount?: number;
-    x?: number;
-    y?: number;
-    label?: string;
-  }): Promise<InputActionResult>;
+  launchApp(
+    sessionId: SessionId,
+    launch: {
+      command: string;
+      args?: readonly string[];
+      cwd?: string;
+      env?: Readonly<Record<string, string>>;
+    },
+  ): Promise<LaunchResult>;
+  captureScreenshot(
+    sessionId: SessionId,
+    options?: {
+      label?: string;
+    },
+  ): Promise<ScreenshotResult>;
+  click(
+    sessionId: SessionId,
+    action: {
+      x: number;
+      y: number;
+      button?: "left" | "right" | "middle";
+      label?: string;
+    },
+  ): Promise<InputActionResult>;
+  doubleClick(
+    sessionId: SessionId,
+    action: {
+      x: number;
+      y: number;
+      button?: "left" | "right" | "middle";
+      label?: string;
+    },
+  ): Promise<InputActionResult>;
+  typeText(
+    sessionId: SessionId,
+    action: {
+      text: string;
+      secret?: boolean;
+      label?: string;
+    },
+  ): Promise<InputActionResult>;
+  hotkey(
+    sessionId: SessionId,
+    action: {
+      keys: readonly string[];
+      label?: string;
+    },
+  ): Promise<InputActionResult>;
+  scroll(
+    sessionId: SessionId,
+    action: {
+      direction: "up" | "down" | "left" | "right";
+      amount?: number;
+      x?: number;
+      y?: number;
+      label?: string;
+    },
+  ): Promise<InputActionResult>;
   getWindows(sessionId: SessionId): Promise<WindowInfo[]>;
-  focusWindow(sessionId: SessionId, target: {
-    id?: string;
-    title?: string;
-    titleIncludes?: string;
-    titleExcludes?: readonly string[];
-    pid?: number;
-    preferLargest?: boolean;
-    excludeDevtools?: boolean;
-  }): Promise<WindowActionResult>;
-  waitForStableScreen(sessionId: SessionId, options?: {
-    timeoutMs?: number;
-    intervalMs?: number;
-    stableChecks?: number;
-    label?: string;
-    mode?: "hash" | "fileSize" | "tolerant";
-    fileSizeToleranceBytes?: number;
-    maxRetainedScreenshots?: number;
-    retainOnlyLast?: boolean;
-  }): Promise<WaitForStableScreenResult>;
+  focusWindow(
+    sessionId: SessionId,
+    target: {
+      id?: string;
+      title?: string;
+      titleIncludes?: string;
+      titleExcludes?: readonly string[];
+      pid?: number;
+      preferLargest?: boolean;
+      excludeDevtools?: boolean;
+    },
+  ): Promise<WindowActionResult>;
+  waitForStableScreen(
+    sessionId: SessionId,
+    options?: {
+      timeoutMs?: number;
+      intervalMs?: number;
+      stableChecks?: number;
+      label?: string;
+      mode?: "hash" | "fileSize" | "tolerant";
+      fileSizeToleranceBytes?: number;
+      maxRetainedScreenshots?: number;
+      retainOnlyLast?: boolean;
+    },
+  ): Promise<WaitForStableScreenResult>;
   waitForWindow(sessionId: SessionId, options?: WaitForWindowOptions): Promise<WindowInfo>;
   openBrowser(sessionId: SessionId, options: BrowserOpenOptions): Promise<BrowserPageRef>;
   browserClick(sessionId: SessionId, options: BrowserClickOptions): Promise<BrowserActionResult>;
@@ -220,11 +247,11 @@ export interface SessionManagerLike {
   browserPress(sessionId: SessionId, options: BrowserPressOptions): Promise<BrowserActionResult>;
   browserAssertText(
     sessionId: SessionId,
-    options: BrowserAssertTextOptions
+    options: BrowserAssertTextOptions,
   ): Promise<BrowserActionResult>;
   browserScreenshot(
     sessionId: SessionId,
-    options?: BrowserScreenshotOptions
+    options?: BrowserScreenshotOptions,
   ): Promise<ScreenshotResult>;
   closeBrowser(sessionId: SessionId, pageId?: string): Promise<void>;
   getTauriDriverStatus(): Promise<TauriDriverStatus>;
@@ -233,11 +260,11 @@ export interface SessionManagerLike {
   tauriFill(sessionId: SessionId, options: TauriFillOptions): Promise<TauriActionResult>;
   tauriAssertText(
     sessionId: SessionId,
-    options: TauriAssertTextOptions
+    options: TauriAssertTextOptions,
   ): Promise<TauriActionResult>;
   tauriScreenshot(
     sessionId: SessionId,
-    options?: TauriScreenshotOptions
+    options?: TauriScreenshotOptions,
   ): Promise<ScreenshotResult>;
   closeTauriApp(sessionId: SessionId, appId?: string): Promise<void>;
   getElectronDriverStatus(): Promise<ElectronDriverStatus>;
@@ -247,24 +274,30 @@ export interface SessionManagerLike {
   electronPress(sessionId: SessionId, options: ElectronPressOptions): Promise<ElectronActionResult>;
   electronAssertText(
     sessionId: SessionId,
-    options: ElectronAssertTextOptions
+    options: ElectronAssertTextOptions,
   ): Promise<ElectronActionResult>;
   electronScreenshot(
     sessionId: SessionId,
-    options?: ElectronScreenshotOptions
+    options?: ElectronScreenshotOptions,
   ): Promise<ScreenshotResult>;
   closeElectronApp(sessionId: SessionId, appId?: string): Promise<void>;
   getLiveObserverStatus(): Promise<LiveObserverStatus>;
-  startLiveObserver(sessionId: SessionId, options?: {
-    sessionId?: SessionId;
-    host?: string;
-    vncPort?: number;
-    webPort?: number;
-    viewOnly?: boolean;
-    password?: string;
-    label?: string;
-  }): Promise<LiveObserverRef>;
-  stopLiveObserver(sessionId: SessionId, observerId?: string): Promise<{
+  startLiveObserver(
+    sessionId: SessionId,
+    options?: {
+      sessionId?: SessionId;
+      host?: string;
+      vncPort?: number;
+      webPort?: number;
+      viewOnly?: boolean;
+      password?: string;
+      label?: string;
+    },
+  ): Promise<LiveObserverRef>;
+  stopLiveObserver(
+    sessionId: SessionId,
+    observerId?: string,
+  ): Promise<{
     readonly sessionId: SessionId;
     readonly observerId: string;
     readonly stopped: boolean;
@@ -276,48 +309,45 @@ export interface SessionManagerLike {
   appClick(sessionId: SessionId, options: AppClickOptions): Promise<AppActionResult>;
   appFill(sessionId: SessionId, options: AppFillOptions): Promise<AppActionResult>;
   appPress(sessionId: SessionId, options: AppPressOptions): Promise<AppActionResult>;
-  appAssertText(
-    sessionId: SessionId,
-    options: AppAssertTextOptions
-  ): Promise<AppActionResult>;
+  appAssertText(sessionId: SessionId, options: AppAssertTextOptions): Promise<AppActionResult>;
   appScreenshot(sessionId: SessionId, options?: AppScreenshotOptions): Promise<ScreenshotResult>;
   closeApp(sessionId: SessionId, appId?: string): Promise<void>;
   visualCompare(sessionId: SessionId, options: VisualCompareOptions): Promise<VisualCompareResult>;
   visualAssertChanged(
     sessionId: SessionId,
-    options: VisualAssertChangedOptions
+    options: VisualAssertChangedOptions,
   ): Promise<VisualCompareResult>;
   visualAssertSimilar(
     sessionId: SessionId,
-    options: VisualAssertSimilarOptions
+    options: VisualAssertSimilarOptions,
   ): Promise<VisualCompareResult>;
   saveVisualBaseline(
     sessionId: SessionId,
-    options: SaveVisualBaselineOptions
+    options: SaveVisualBaselineOptions,
   ): Promise<VisualBaselineRef>;
   listVisualBaselines(
     sessionId: SessionId,
-    options?: ListVisualBaselinesOptions
+    options?: ListVisualBaselinesOptions,
   ): Promise<VisualBaselineRef[]>;
   compareVisualBaseline(
     sessionId: SessionId,
-    options: CompareVisualBaselineOptions
+    options: CompareVisualBaselineOptions,
   ): Promise<VisualCompareResult>;
   getAnnotationRegion(
     sessionId: SessionId,
-    options: AnnotationRegionOptions
+    options: AnnotationRegionOptions,
   ): Promise<AnnotationRegionResult>;
   visualAssertAnnotationChanged(
     sessionId: SessionId,
-    options: VisualAssertAnnotationChangedOptions
+    options: VisualAssertAnnotationChangedOptions,
   ): Promise<VisualCompareResult>;
   visualAssertAnnotationSimilar(
     sessionId: SessionId,
-    options: VisualAssertAnnotationSimilarOptions
+    options: VisualAssertAnnotationSimilarOptions,
   ): Promise<VisualCompareResult>;
   visualAssertChangeContained(
     sessionId: SessionId,
-    options: VisualAssertChangeContainedOptions
+    options: VisualAssertChangeContainedOptions,
   ): Promise<VisualChangeContainmentResult>;
   listVisualAssertions(sessionId: SessionId): Promise<VisualCompareResult[]>;
   getVisualDiffFilePath(sessionId: SessionId, fileName: string): string;
@@ -326,7 +356,7 @@ export interface SessionManagerLike {
   getAnnotationFilePath(sessionId: SessionId, fileName: string): string;
   createAnnotation(
     sessionId: SessionId,
-    input: CreateAnnotationInput
+    input: CreateAnnotationInput,
   ): Promise<ScreenshotAnnotation>;
   listAnnotations(sessionId: SessionId): Promise<ScreenshotAnnotation[]>;
   getVisualHandoff(sessionId: SessionId): Promise<VisualHandoff>;
@@ -336,14 +366,14 @@ export interface SessionManagerLike {
 export class DesktopHttpApi {
   constructor(
     private readonly sessionManager: SessionManagerLike = new SessionManager(),
-    private readonly defaultWorkspaceDir: string = process.cwd()
+    private readonly defaultWorkspaceDir: string = process.cwd(),
   ) {}
 
   health(): Record<string, unknown> {
     return {
       ok: true,
       service: "agent-desktop-harness-http",
-      version: "0.0.0"
+      version: "0.0.0",
     };
   }
 
@@ -351,9 +381,7 @@ export class DesktopHttpApi {
     return {
       ok: true,
       experimental: true,
-      status: serializeTauriDriverStatus(
-        await this.sessionManager.getTauriDriverStatus()
-      )
+      status: serializeTauriDriverStatus(await this.sessionManager.getTauriDriverStatus()),
     };
   }
 
@@ -361,18 +389,14 @@ export class DesktopHttpApi {
     return {
       ok: true,
       experimental: true,
-      status: serializeElectronDriverStatus(
-        await this.sessionManager.getElectronDriverStatus()
-      )
+      status: serializeElectronDriverStatus(await this.sessionManager.getElectronDriverStatus()),
     };
   }
 
   async driverStatus(): Promise<Record<string, unknown>> {
     return {
       ok: true,
-      status: serializeDriverRouterStatus(
-        await this.sessionManager.getDriverRouterStatus()
-      )
+      status: serializeDriverRouterStatus(await this.sessionManager.getDriverRouterStatus()),
     };
   }
 
@@ -380,9 +404,7 @@ export class DesktopHttpApi {
     return {
       ok: true,
       optional: true,
-      status: serializeLiveObserverStatus(
-        await this.sessionManager.getLiveObserverStatus()
-      )
+      status: serializeLiveObserverStatus(await this.sessionManager.getLiveObserverStatus()),
     };
   }
 
@@ -395,28 +417,28 @@ export class DesktopHttpApi {
       display: {
         width: args.width,
         height: args.height,
-        depth: args.depth
+        depth: args.depth,
       },
-      policy: args.policy
+      policy: args.policy,
     });
 
     return {
       ok: true,
-      session: serializeSession(session)
+      session: serializeSession(session),
     };
   }
 
   listSessions(): Record<string, unknown> {
     return {
       ok: true,
-      sessions: this.sessionManager.listSessions().map(serializeSession)
+      sessions: this.sessionManager.listSessions().map(serializeSession),
     };
   }
 
   getSession(sessionId: string): Record<string, unknown> {
     return {
       ok: true,
-      session: serializeSession(this.requireSession(sessionId))
+      session: serializeSession(this.requireSession(sessionId)),
     };
   }
 
@@ -425,7 +447,7 @@ export class DesktopHttpApi {
     await this.sessionManager.stopSession(sessionId);
     return {
       ok: true,
-      sessionId
+      sessionId,
     };
   }
 
@@ -436,15 +458,15 @@ export class DesktopHttpApi {
       command: args.command,
       args: args.args ?? [],
       cwd: args.cwd,
-      env: args.env
+      env: args.env,
     });
 
     return {
       ok: true,
       launch: {
         ...serializeLaunchResult(result),
-        label: args.label
-      }
+        label: args.label,
+      },
     };
   }
 
@@ -455,9 +477,9 @@ export class DesktopHttpApi {
       ok: true,
       screenshot: serializeScreenshot(
         await this.sessionManager.captureScreenshot(sessionId, {
-          label: args.label
-        })
-      )
+          label: args.label,
+        }),
+      ),
     };
   }
 
@@ -470,8 +492,8 @@ export class DesktopHttpApi {
         x: args.x,
         y: args.y,
         button: args.button,
-        label: args.label
-      })
+        label: args.label,
+      }),
     };
   }
 
@@ -484,8 +506,8 @@ export class DesktopHttpApi {
         x: args.x,
         y: args.y,
         button: args.button,
-        label: args.label
-      })
+        label: args.label,
+      }),
     };
   }
 
@@ -497,20 +519,16 @@ export class DesktopHttpApi {
       const result = await this.sessionManager.typeText(sessionId, {
         text: args.text,
         secret: args.secret,
-        label: args.label
+        label: args.label,
       });
 
       return {
         ok: true,
-        result: args.secret ? redactTypeTextResult(result, args.text.length) : result
+        result: args.secret ? redactTypeTextResult(result, args.text.length) : result,
       };
     } catch (error) {
       if (args.secret) {
-        throw new HttpError(
-          500,
-          "INTERNAL_ERROR",
-          redactErrorMessage(error, args.text)
-        );
+        throw new HttpError(500, "INTERNAL_ERROR", redactErrorMessage(error, args.text));
       }
       throw error;
     }
@@ -523,8 +541,8 @@ export class DesktopHttpApi {
       ok: true,
       result: await this.sessionManager.hotkey(sessionId, {
         keys: args.keys,
-        label: args.label
-      })
+        label: args.label,
+      }),
     };
   }
 
@@ -538,8 +556,8 @@ export class DesktopHttpApi {
         amount: args.amount,
         x: args.x,
         y: args.y,
-        label: args.label
-      })
+        label: args.label,
+      }),
     };
   }
 
@@ -547,7 +565,7 @@ export class DesktopHttpApi {
     this.requireSession(sessionId);
     return {
       ok: true,
-      windows: await this.sessionManager.getWindows(sessionId)
+      windows: await this.sessionManager.getWindows(sessionId),
     };
   }
 
@@ -563,15 +581,12 @@ export class DesktopHttpApi {
         titleExcludes: args.titleExcludes,
         pid: args.pid,
         preferLargest: args.preferLargest,
-        excludeDevtools: args.excludeDevtools
-      })
+        excludeDevtools: args.excludeDevtools,
+      }),
     };
   }
 
-  async waitForStableScreen(
-    sessionId: string,
-    body: unknown
-  ): Promise<Record<string, unknown>> {
+  async waitForStableScreen(sessionId: string, body: unknown): Promise<Record<string, unknown>> {
     this.requireSession(sessionId);
     const args = waitForStableScreenBodySchema.parse(body);
     return {
@@ -585,9 +600,9 @@ export class DesktopHttpApi {
           mode: args.mode,
           fileSizeToleranceBytes: args.fileSizeToleranceBytes,
           maxRetainedScreenshots: args.maxRetainedScreenshots,
-          retainOnlyLast: args.retainOnlyLast
-        })
-      )
+          retainOnlyLast: args.retainOnlyLast,
+        }),
+      ),
     };
   }
 
@@ -603,8 +618,8 @@ export class DesktopHttpApi {
         timeoutMs: args.timeoutMs,
         intervalMs: args.intervalMs,
         preferLargest: args.preferLargest,
-        excludeDevtools: args.excludeDevtools
-      })
+        excludeDevtools: args.excludeDevtools,
+      }),
     };
   }
 
@@ -621,9 +636,9 @@ export class DesktopHttpApi {
           viewport: args.viewport,
           userDataDir: args.userDataDir,
           label: args.label,
-          timeoutMs: args.timeoutMs
-        })
-      )
+          timeoutMs: args.timeoutMs,
+        }),
+      ),
     };
   }
 
@@ -632,9 +647,7 @@ export class DesktopHttpApi {
     const args = browserClickBodySchema.parse(body);
     return {
       ok: true,
-      result: serializeBrowserActionResult(
-        await this.sessionManager.browserClick(sessionId, args)
-      )
+      result: serializeBrowserActionResult(await this.sessionManager.browserClick(sessionId, args)),
     };
   }
 
@@ -646,8 +659,8 @@ export class DesktopHttpApi {
       return {
         ok: true,
         result: serializeBrowserActionResult(
-          await this.sessionManager.browserFill(sessionId, args)
-        )
+          await this.sessionManager.browserFill(sessionId, args),
+        ),
       };
     } catch (error) {
       if (args.secret) {
@@ -662,23 +675,18 @@ export class DesktopHttpApi {
     const args = browserPressBodySchema.parse(body);
     return {
       ok: true,
-      result: serializeBrowserActionResult(
-        await this.sessionManager.browserPress(sessionId, args)
-      )
+      result: serializeBrowserActionResult(await this.sessionManager.browserPress(sessionId, args)),
     };
   }
 
-  async browserAssertText(
-    sessionId: string,
-    body: unknown
-  ): Promise<Record<string, unknown>> {
+  async browserAssertText(sessionId: string, body: unknown): Promise<Record<string, unknown>> {
     this.requireSession(sessionId);
     const args = browserAssertTextBodySchema.parse(body);
     return {
       ok: true,
       result: serializeBrowserActionResult(
-        await this.sessionManager.browserAssertText(sessionId, args)
-      )
+        await this.sessionManager.browserAssertText(sessionId, args),
+      ),
     };
   }
 
@@ -691,9 +699,9 @@ export class DesktopHttpApi {
         await this.sessionManager.browserScreenshot(sessionId, {
           pageId: args.pageId,
           label: args.label,
-          fullPage: args.fullPage
-        })
-      )
+          fullPage: args.fullPage,
+        }),
+      ),
     };
   }
 
@@ -704,7 +712,7 @@ export class DesktopHttpApi {
     return {
       ok: true,
       sessionId,
-      pageId: args.pageId
+      pageId: args.pageId,
     };
   }
 
@@ -721,14 +729,14 @@ export class DesktopHttpApi {
       nativePort: args.nativePort,
       timeoutMs: args.timeoutMs,
       windowTitleIncludes: args.windowTitleIncludes,
-      applicationPath: args.applicationPath
+      applicationPath: args.applicationPath,
     });
     return {
       ok: true,
       experimental: true,
       mode: app.mode,
       app: serializeTauriAppRef(app),
-      warnings: app.warnings
+      warnings: app.warnings,
     };
   }
 
@@ -741,7 +749,7 @@ export class DesktopHttpApi {
       experimental: true,
       mode: result.mode,
       result: serializeTauriActionResult(result),
-      warnings: result.warnings
+      warnings: result.warnings,
     };
   }
 
@@ -756,7 +764,7 @@ export class DesktopHttpApi {
         experimental: true,
         mode: result.mode,
         result: serializeTauriActionResult(result),
-        warnings: result.warnings
+        warnings: result.warnings,
       };
     } catch (error) {
       if (args.secret) {
@@ -766,10 +774,7 @@ export class DesktopHttpApi {
     }
   }
 
-  async tauriAssertText(
-    sessionId: string,
-    body: unknown
-  ): Promise<Record<string, unknown>> {
+  async tauriAssertText(sessionId: string, body: unknown): Promise<Record<string, unknown>> {
     this.requireSession(sessionId);
     const args = tauriAssertTextBodySchema.parse(body);
     const result = await this.sessionManager.tauriAssertText(sessionId, args);
@@ -778,7 +783,7 @@ export class DesktopHttpApi {
       experimental: true,
       mode: result.mode,
       result: serializeTauriActionResult(result),
-      warnings: result.warnings
+      warnings: result.warnings,
     };
   }
 
@@ -791,9 +796,9 @@ export class DesktopHttpApi {
       screenshot: serializeScreenshot(
         await this.sessionManager.tauriScreenshot(sessionId, {
           appId: args.appId,
-          label: args.label
-        })
-      )
+          label: args.label,
+        }),
+      ),
     };
   }
 
@@ -805,7 +810,7 @@ export class DesktopHttpApi {
       ok: true,
       experimental: true,
       sessionId,
-      appId: args.appId
+      appId: args.appId,
     };
   }
 
@@ -822,14 +827,14 @@ export class DesktopHttpApi {
       label: args.label,
       timeoutMs: args.timeoutMs,
       windowTitleIncludes: args.windowTitleIncludes,
-      excludeDevtools: args.excludeDevtools
+      excludeDevtools: args.excludeDevtools,
     });
     return {
       ok: true,
       experimental: true,
       mode: app.mode,
       app: serializeElectronAppRef(app),
-      warnings: app.warnings
+      warnings: app.warnings,
     };
   }
 
@@ -842,7 +847,7 @@ export class DesktopHttpApi {
       experimental: true,
       mode: result.mode,
       result: serializeElectronActionResult(result),
-      warnings: result.warnings
+      warnings: result.warnings,
     };
   }
 
@@ -857,7 +862,7 @@ export class DesktopHttpApi {
         experimental: true,
         mode: result.mode,
         result: serializeElectronActionResult(result),
-        warnings: result.warnings
+        warnings: result.warnings,
       };
     } catch (error) {
       if (args.secret) {
@@ -876,14 +881,11 @@ export class DesktopHttpApi {
       experimental: true,
       mode: result.mode,
       result: serializeElectronActionResult(result),
-      warnings: result.warnings
+      warnings: result.warnings,
     };
   }
 
-  async electronAssertText(
-    sessionId: string,
-    body: unknown
-  ): Promise<Record<string, unknown>> {
+  async electronAssertText(sessionId: string, body: unknown): Promise<Record<string, unknown>> {
     this.requireSession(sessionId);
     const args = electronAssertTextBodySchema.parse(body);
     const result = await this.sessionManager.electronAssertText(sessionId, args);
@@ -892,7 +894,7 @@ export class DesktopHttpApi {
       experimental: true,
       mode: result.mode,
       result: serializeElectronActionResult(result),
-      warnings: result.warnings
+      warnings: result.warnings,
     };
   }
 
@@ -906,9 +908,9 @@ export class DesktopHttpApi {
         await this.sessionManager.electronScreenshot(sessionId, {
           appId: args.appId,
           label: args.label,
-          fullPage: args.fullPage
-        })
-      )
+          fullPage: args.fullPage,
+        }),
+      ),
     };
   }
 
@@ -920,7 +922,7 @@ export class DesktopHttpApi {
       ok: true,
       experimental: true,
       sessionId,
-      appId: args.appId
+      appId: args.appId,
     };
   }
 
@@ -928,7 +930,7 @@ export class DesktopHttpApi {
     this.requireSession(sessionId);
     return {
       ok: true,
-      observers: this.sessionManager.listLiveObservers(sessionId).map(serializeLiveObserverRef)
+      observers: this.sessionManager.listLiveObservers(sessionId).map(serializeLiveObserverRef),
     };
   }
 
@@ -938,19 +940,16 @@ export class DesktopHttpApi {
     const observer = await this.sessionManager.startLiveObserver(sessionId, args);
     return {
       ok: true,
-      observer: serializeLiveObserverRef(observer)
+      observer: serializeLiveObserverRef(observer),
     };
   }
 
-  async stopLiveObserver(
-    sessionId: string,
-    observerId: string
-  ): Promise<Record<string, unknown>> {
+  async stopLiveObserver(sessionId: string, observerId: string): Promise<Record<string, unknown>> {
     this.requireSession(sessionId);
     const result = await this.sessionManager.stopLiveObserver(sessionId, observerId);
     return {
       ok: true,
-      result
+      result,
     };
   }
 
@@ -960,7 +959,7 @@ export class DesktopHttpApi {
     const decision = await this.sessionManager.routeDriver(sessionId, args);
     return {
       ok: true,
-      decision: serializeDriverRouteDecision(decision)
+      decision: serializeDriverRouteDecision(decision),
     };
   }
 
@@ -974,7 +973,7 @@ export class DesktopHttpApi {
       selectedDriver: app.selectedDriver,
       semantic: app.semantic,
       fallbackUsed: app.fallbackUsed,
-      warnings: app.warnings
+      warnings: app.warnings,
     };
   }
 
@@ -988,7 +987,7 @@ export class DesktopHttpApi {
       selectedDriver: result.selectedDriver,
       semantic: result.semantic,
       fallbackUsed: result.fallbackUsed,
-      warnings: result.warnings
+      warnings: result.warnings,
     };
   }
 
@@ -1003,7 +1002,7 @@ export class DesktopHttpApi {
         selectedDriver: result.selectedDriver,
         semantic: result.semantic,
         fallbackUsed: result.fallbackUsed,
-        warnings: result.warnings
+        warnings: result.warnings,
       };
     } catch (error) {
       if (args.secret) {
@@ -1023,7 +1022,7 @@ export class DesktopHttpApi {
       selectedDriver: result.selectedDriver,
       semantic: result.semantic,
       fallbackUsed: result.fallbackUsed,
-      warnings: result.warnings
+      warnings: result.warnings,
     };
   }
 
@@ -1037,7 +1036,7 @@ export class DesktopHttpApi {
       selectedDriver: result.selectedDriver,
       semantic: result.semantic,
       fallbackUsed: result.fallbackUsed,
-      warnings: result.warnings
+      warnings: result.warnings,
     };
   }
 
@@ -1046,9 +1045,7 @@ export class DesktopHttpApi {
     const args = appScreenshotBodySchema.parse(body);
     return {
       ok: true,
-      screenshot: serializeScreenshot(
-        await this.sessionManager.appScreenshot(sessionId, args)
-      )
+      screenshot: serializeScreenshot(await this.sessionManager.appScreenshot(sessionId, args)),
     };
   }
 
@@ -1060,7 +1057,7 @@ export class DesktopHttpApi {
       ok: true,
       sessionId,
       appId: args.appId,
-      success: true
+      success: true,
     };
   }
 
@@ -1070,8 +1067,8 @@ export class DesktopHttpApi {
     return {
       ok: true,
       result: serializeVisualCompareResult(
-        await this.sessionManager.visualCompare(sessionId, args)
-      )
+        await this.sessionManager.visualCompare(sessionId, args),
+      ),
     };
   }
 
@@ -1081,8 +1078,8 @@ export class DesktopHttpApi {
     return {
       ok: true,
       result: serializeVisualCompareResult(
-        await this.sessionManager.visualAssertChanged(sessionId, args)
-      )
+        await this.sessionManager.visualAssertChanged(sessionId, args),
+      ),
     };
   }
 
@@ -1092,8 +1089,8 @@ export class DesktopHttpApi {
     return {
       ok: true,
       result: serializeVisualCompareResult(
-        await this.sessionManager.visualAssertSimilar(sessionId, args)
-      )
+        await this.sessionManager.visualAssertSimilar(sessionId, args),
+      ),
     };
   }
 
@@ -1103,22 +1100,22 @@ export class DesktopHttpApi {
     return {
       ok: true,
       baseline: serializeVisualBaseline(
-        await this.sessionManager.saveVisualBaseline(sessionId, args)
-      )
+        await this.sessionManager.saveVisualBaseline(sessionId, args),
+      ),
     };
   }
 
   async listVisualBaselines(
     sessionId: string,
-    query: unknown = {}
+    query: unknown = {},
   ): Promise<Record<string, unknown>> {
     this.requireSession(sessionId);
     const args = listVisualBaselinesQuerySchema.parse(query);
     return {
       ok: true,
       baselines: (await this.sessionManager.listVisualBaselines(sessionId, args)).map(
-        serializeVisualBaseline
-      )
+        serializeVisualBaseline,
+      ),
     };
   }
 
@@ -1128,50 +1125,50 @@ export class DesktopHttpApi {
     return {
       ok: true,
       result: serializeVisualCompareResult(
-        await this.sessionManager.compareVisualBaseline(sessionId, args)
-      )
+        await this.sessionManager.compareVisualBaseline(sessionId, args),
+      ),
     };
   }
 
   async visualAssertAnnotationChanged(
     sessionId: string,
-    body: unknown
+    body: unknown,
   ): Promise<Record<string, unknown>> {
     this.requireSession(sessionId);
     const args = visualAssertAnnotationChangedBodySchema.parse(body);
     return {
       ok: true,
       result: serializeVisualCompareResult(
-        await this.sessionManager.visualAssertAnnotationChanged(sessionId, args)
-      )
+        await this.sessionManager.visualAssertAnnotationChanged(sessionId, args),
+      ),
     };
   }
 
   async visualAssertAnnotationSimilar(
     sessionId: string,
-    body: unknown
+    body: unknown,
   ): Promise<Record<string, unknown>> {
     this.requireSession(sessionId);
     const args = visualAssertAnnotationSimilarBodySchema.parse(body);
     return {
       ok: true,
       result: serializeVisualCompareResult(
-        await this.sessionManager.visualAssertAnnotationSimilar(sessionId, args)
-      )
+        await this.sessionManager.visualAssertAnnotationSimilar(sessionId, args),
+      ),
     };
   }
 
   async visualAssertChangeContained(
     sessionId: string,
-    body: unknown
+    body: unknown,
   ): Promise<Record<string, unknown>> {
     this.requireSession(sessionId);
     const args = visualAssertChangeContainedBodySchema.parse(body);
     return {
       ok: true,
       result: serializeVisualCompareResult(
-        await this.sessionManager.visualAssertChangeContained(sessionId, args)
-      )
+        await this.sessionManager.visualAssertChangeContained(sessionId, args),
+      ),
     };
   }
 
@@ -1180,14 +1177,14 @@ export class DesktopHttpApi {
     return {
       ok: true,
       assertions: (await this.sessionManager.listVisualAssertions(sessionId)).map(
-        serializeVisualCompareResult
-      )
+        serializeVisualCompareResult,
+      ),
     };
   }
 
   async getVisualDiffFile(
     sessionId: string,
-    fileName: string
+    fileName: string,
   ): Promise<{ readonly path: string; readonly body: Buffer }> {
     this.requireSession(sessionId);
     const safeFileName = pngFileNameSchema.parse(fileName);
@@ -1195,7 +1192,7 @@ export class DesktopHttpApi {
     try {
       return {
         path,
-        body: await readFile(path)
+        body: await readFile(path),
       };
     } catch {
       throw new HttpError(404, "VISUAL_DIFF_NOT_FOUND", `Visual diff not found: ${safeFileName}`);
@@ -1211,13 +1208,13 @@ export class DesktopHttpApi {
         ok: true,
         sessionId,
         path,
-        text: await readFile(path, "utf8")
+        text: await readFile(path, "utf8"),
       };
     } catch {
       throw new HttpError(
         404,
         "EVIDENCE_REPORT_NOT_FOUND",
-        `Evidence report is not available for session ${sessionId}. Stop the session first to generate report.md.`
+        `Evidence report is not available for session ${sessionId}. Stop the session first to generate report.md.`,
       );
     }
   }
@@ -1227,14 +1224,14 @@ export class DesktopHttpApi {
     return {
       ok: true,
       screenshots: (await this.sessionManager.listScreenshots(sessionId)).map(
-        serializeScreenshotArtifact
-      )
+        serializeScreenshotArtifact,
+      ),
     };
   }
 
   async getScreenshotFile(
     sessionId: string,
-    fileName: string
+    fileName: string,
   ): Promise<{ readonly path: string; readonly body: Buffer }> {
     this.requireSession(sessionId);
     const safeFileName = pngFileNameSchema.parse(fileName);
@@ -1242,7 +1239,7 @@ export class DesktopHttpApi {
     try {
       return {
         path,
-        body: await readFile(path)
+        body: await readFile(path),
       };
     } catch {
       throw new HttpError(404, "SCREENSHOT_NOT_FOUND", `Screenshot not found: ${safeFileName}`);
@@ -1253,7 +1250,7 @@ export class DesktopHttpApi {
     this.requireSession(sessionId);
     return {
       ok: true,
-      annotations: (await this.sessionManager.listAnnotations(sessionId)).map(serializeAnnotation)
+      annotations: (await this.sessionManager.listAnnotations(sessionId)).map(serializeAnnotation),
     };
   }
 
@@ -1262,15 +1259,13 @@ export class DesktopHttpApi {
     const args = createAnnotationBodySchema.parse(body);
     return {
       ok: true,
-      annotation: serializeAnnotation(
-        await this.sessionManager.createAnnotation(sessionId, args)
-      )
+      annotation: serializeAnnotation(await this.sessionManager.createAnnotation(sessionId, args)),
     };
   }
 
   async getAnnotationFile(
     sessionId: string,
-    fileName: string
+    fileName: string,
   ): Promise<{ readonly path: string; readonly body: Buffer }> {
     this.requireSession(sessionId);
     const safeFileName = pngFileNameSchema.parse(fileName);
@@ -1278,10 +1273,14 @@ export class DesktopHttpApi {
     try {
       return {
         path,
-        body: await readFile(path)
+        body: await readFile(path),
       };
     } catch {
-      throw new HttpError(404, "ANNOTATION_FILE_NOT_FOUND", `Annotation file not found: ${safeFileName}`);
+      throw new HttpError(
+        404,
+        "ANNOTATION_FILE_NOT_FOUND",
+        `Annotation file not found: ${safeFileName}`,
+      );
     }
   }
 
@@ -1289,7 +1288,7 @@ export class DesktopHttpApi {
     this.requireSession(sessionId);
     return {
       ok: true,
-      ...serializeVisualHandoff(await this.sessionManager.getVisualHandoff(sessionId))
+      ...serializeVisualHandoff(await this.sessionManager.getVisualHandoff(sessionId)),
     };
   }
 
@@ -1309,7 +1308,7 @@ export class DesktopHttpApi {
       throw new HttpError(
         404,
         "SESSION_NOT_FOUND",
-        `Desktop session not found: ${parsedSessionId}`
+        `Desktop session not found: ${parsedSessionId}`,
       );
     }
     return session;

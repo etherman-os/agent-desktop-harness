@@ -1,15 +1,15 @@
-import { z } from "zod";
 import {
   MissingDependencyError,
   PolicyError,
-  SessionNotFoundError
+  SessionNotFoundError,
 } from "@agent-desktop-harness/core";
+import { z } from "zod";
 
 export class HttpError extends Error {
   constructor(
     readonly statusCode: number,
     readonly code: string,
-    message: string
+    message: string,
   ) {
     super(message);
     this.name = "HttpError";
@@ -52,17 +52,13 @@ export function errorToHttpResponse(error: unknown): {
     return makeError(404, "SESSION_NOT_FOUND", error.message);
   }
 
-  return makeError(
-    500,
-    "INTERNAL_ERROR",
-    error instanceof Error ? error.message : String(error)
-  );
+  return makeError(500, "INTERNAL_ERROR", error instanceof Error ? error.message : String(error));
 }
 
 function makeError(
   statusCode: number,
   code: string,
-  message: string
+  message: string,
 ): { readonly statusCode: number; readonly body: ErrorResponse } {
   return {
     statusCode,
@@ -70,9 +66,9 @@ function makeError(
       ok: false,
       error: {
         code,
-        message
-      }
-    }
+        message,
+      },
+    },
   };
 }
 

@@ -1,5 +1,6 @@
-import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { copyFile, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
+import { ProcessError } from "../errors.js";
 import type {
   ActionLogRecord,
   CreateAnnotationInput,
@@ -8,16 +9,8 @@ import type {
   ScreenshotArtifact,
   ScreenshotOptions,
   ScreenshotResult,
-  VisualHandoff
+  VisualHandoff,
 } from "../types.js";
-import type {
-  ListVisualBaselinesOptions,
-  SaveVisualBaselineOptions,
-  VisualBaselineRef,
-  VisualCompareResult
-} from "../visual/visualTypes.js";
-import { readPngSize } from "../visual/imageDiff.js";
-import { ProcessError } from "../errors.js";
 import {
   appendJsonLine,
   ensureDirectory,
@@ -25,9 +18,16 @@ import {
   pathExists,
   touchFile,
   writeJsonAtomic,
-  writeTextAtomic
+  writeTextAtomic,
 } from "../utils/fs.js";
 import { isoNow } from "../utils/time.js";
+import { readPngSize } from "../visual/imageDiff.js";
+import type {
+  ListVisualBaselinesOptions,
+  SaveVisualBaselineOptions,
+  VisualBaselineRef,
+  VisualCompareResult,
+} from "../visual/visualTypes.js";
 
 export interface EvidencePaths {
   readonly sessionPath: string;
@@ -71,7 +71,7 @@ export class EvidenceStore {
       visualDiffsPath: join(sessionPath, "visual-diffs"),
       visualAssertionsJsonlPath: join(sessionPath, "visual-assertions.jsonl"),
       reportPath: join(sessionPath, "report.md"),
-      visualHandoffPath: join(sessionPath, "visual-handoff.md")
+      visualHandoffPath: join(sessionPath, "visual-handoff.md"),
     };
   }
 
@@ -80,16 +80,12 @@ export class EvidenceStore {
     return {
       rootPath,
       baselinesPath: join(rootPath, "baselines"),
-      baselinesJsonlPath: join(rootPath, "baselines", "baselines.jsonl")
+      baselinesJsonlPath: join(rootPath, "baselines", "baselines.jsonl"),
     };
   }
 
   async createSession(session: DesktopSession): Promise<void> {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     await ensureDirectory(paths.screenshotsPath);
     await ensureDirectory(paths.transientPath);
     await ensureDirectory(paths.annotationsPath);
@@ -101,33 +97,21 @@ export class EvidenceStore {
   }
 
   async writeSession(session: DesktopSession): Promise<void> {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     await writeJsonAtomic(paths.sessionJsonPath, serializeSession(session));
   }
 
   async appendAction(session: DesktopSession, record: ActionLogRecord): Promise<void> {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     await appendJsonLine(paths.actionsJsonlPath, record);
   }
 
   getScreenshotPath(
     session: DesktopSession,
     sequence: number,
-    options: ScreenshotOptions = {}
+    options: ScreenshotOptions = {},
   ): string {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     const label = sanitizeFileLabel(options.label ?? "screenshot");
     const fileName = `${String(sequence).padStart(4, "0")}-${label}.png`;
     return join(options.transient === true ? paths.transientPath : paths.screenshotsPath, fileName);
@@ -135,36 +119,32 @@ export class EvidenceStore {
 
   async moveScreenshotToTransient(
     session: DesktopSession,
-    screenshot: ScreenshotResult
+    screenshot: ScreenshotResult,
   ): Promise<ScreenshotResult> {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     const fileName = basename(screenshot.path);
     assertSafePngFileName(fileName, "screenshot file name");
     assertPathInside(
       paths.screenshotsPath,
       screenshot.path,
-      "Screenshot path is outside the retained screenshots directory."
+      "Screenshot path is outside the retained screenshots directory.",
     );
     await ensureDirectory(paths.transientPath);
     const transientPath = join(paths.transientPath, fileName);
-    assertPathInside(paths.transientPath, transientPath, "Transient screenshot path is outside the session evidence directory.");
+    assertPathInside(
+      paths.transientPath,
+      transientPath,
+      "Transient screenshot path is outside the session evidence directory.",
+    );
     await rename(screenshot.path, transientPath);
     return {
       ...screenshot,
-      path: transientPath
+      path: transientPath,
     };
   }
 
   async listScreenshots(session: DesktopSession): Promise<ScreenshotArtifact[]> {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     const actions = await readActionRecords(paths.actionsJsonlPath);
     const actionByPath = new Map<string, ActionLogRecord>();
     for (const action of actions) {
@@ -198,7 +178,7 @@ export class EvidenceStore {
         path,
         sequence: toOptionalNumber(action?.details?.sequence) ?? parsed.sequence,
         label: toOptionalString(action?.details?.label) ?? parsed.label,
-        createdAt: action?.timestamp ?? fileStat.mtime.toISOString()
+        createdAt: action?.timestamp ?? fileStat.mtime.toISOString(),
       });
     }
 
@@ -206,35 +186,31 @@ export class EvidenceStore {
   }
 
   getScreenshotFilePath(session: DesktopSession, fileName: string): string {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     assertSafePngFileName(fileName, "screenshot file name");
     const path = join(paths.screenshotsPath, fileName);
-    assertPathInside(paths.screenshotsPath, path, "Screenshot path is outside the session evidence directory.");
+    assertPathInside(
+      paths.screenshotsPath,
+      path,
+      "Screenshot path is outside the session evidence directory.",
+    );
     return path;
   }
 
   getAnnotationFilePath(session: DesktopSession, fileName: string): string {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     assertSafePngFileName(fileName, "annotation file name");
     const path = join(paths.annotationsPath, fileName);
-    assertPathInside(paths.annotationsPath, path, "Annotation path is outside the session evidence directory.");
+    assertPathInside(
+      paths.annotationsPath,
+      path,
+      "Annotation path is outside the session evidence directory.",
+    );
     return path;
   }
 
   resolveEvidencePath(session: DesktopSession, inputPath: string): string {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     const trimmed = inputPath.trim();
     if (trimmed.length === 0) {
       throw new ProcessError("Evidence path cannot be empty.");
@@ -248,66 +224,51 @@ export class EvidenceStore {
     assertPathInside(
       paths.sessionPath,
       resolvedPath,
-      "Visual QA path is outside the session evidence directory."
+      "Visual QA path is outside the session evidence directory.",
     );
     return resolvedPath;
   }
 
   toEvidenceRelativePath(session: DesktopSession, path: string): string {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     return toEvidenceRelativePath(paths.sessionPath, path);
   }
 
   async getNextVisualDiffPath(session: DesktopSession, label = "visual-diff"): Promise<string> {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     await ensureDirectory(paths.visualDiffsPath);
     const sequence = (await this.listVisualAssertions(session)).length + 1;
     const fileName = `diff_${String(sequence).padStart(3, "0")}-${sanitizeFileLabel(label)}.png`;
     const path = join(paths.visualDiffsPath, fileName);
-    assertPathInside(paths.visualDiffsPath, path, "Visual diff path is outside the session evidence directory.");
+    assertPathInside(
+      paths.visualDiffsPath,
+      path,
+      "Visual diff path is outside the session evidence directory.",
+    );
     return path;
   }
 
   getVisualDiffFilePath(session: DesktopSession, fileName: string): string {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     assertSafePngFileName(fileName, "visual diff file name");
     const path = join(paths.visualDiffsPath, fileName);
-    assertPathInside(paths.visualDiffsPath, path, "Visual diff path is outside the session evidence directory.");
+    assertPathInside(
+      paths.visualDiffsPath,
+      path,
+      "Visual diff path is outside the session evidence directory.",
+    );
     return path;
   }
 
-  async appendVisualAssertion(
-    session: DesktopSession,
-    result: VisualCompareResult
-  ): Promise<void> {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+  async appendVisualAssertion(session: DesktopSession, result: VisualCompareResult): Promise<void> {
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     await touchFile(paths.visualAssertionsJsonlPath);
     await appendJsonLine(paths.visualAssertionsJsonlPath, result);
     await this.regenerateVisualHandoff(session);
   }
 
   async listVisualAssertions(session: DesktopSession): Promise<VisualCompareResult[]> {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     try {
       const contents = await readFile(paths.visualAssertionsJsonlPath, "utf8");
       return contents
@@ -321,21 +282,21 @@ export class EvidenceStore {
 
   async saveVisualBaseline(
     session: DesktopSession,
-    options: SaveVisualBaselineOptions
+    options: SaveVisualBaselineOptions,
   ): Promise<VisualBaselineRef> {
     const sourceScreenshotPath = this.resolveEvidencePath(session, options.screenshotPath);
     const baselineName = sanitizeBaselinePart(options.name, "baseline name");
     const suite = sanitizeBaselinePart(options.suite ?? "default", "baseline suite");
     const baselinePaths = this.getBaselinePaths(
       session.workspacePath,
-      session.config.evidenceRootPath
+      session.config.evidenceRootPath,
     );
     const suitePath = join(baselinePaths.baselinesPath, suite);
     const baselinePath = join(suitePath, `${baselineName}.png`);
     assertPathInside(
       baselinePaths.baselinesPath,
       baselinePath,
-      "Visual baseline path is outside the baseline directory."
+      "Visual baseline path is outside the baseline directory.",
     );
 
     const existing = await this.findVisualBaseline(session, baselineName, suite);
@@ -357,7 +318,7 @@ export class EvidenceStore {
       height: size.height,
       createdAt: existing?.createdAt ?? now,
       updatedAt: existing ? now : undefined,
-      metadata: options.metadata
+      metadata: options.metadata,
     };
     await appendJsonLine(baselinePaths.baselinesJsonlPath, baseline);
     return baseline;
@@ -365,11 +326,11 @@ export class EvidenceStore {
 
   async listVisualBaselines(
     session: DesktopSession,
-    options: ListVisualBaselinesOptions = {}
+    options: ListVisualBaselinesOptions = {},
   ): Promise<VisualBaselineRef[]> {
     const baselinePaths = this.getBaselinePaths(
       session.workspacePath,
-      session.config.evidenceRootPath
+      session.config.evidenceRootPath,
     );
     const requestedSuite = options.suite
       ? sanitizeBaselinePart(options.suite, "baseline suite")
@@ -389,7 +350,9 @@ export class EvidenceStore {
         latestByKey.set(`${suite}/${baseline.name}`, baseline);
       }
       return [...latestByKey.values()].sort((left, right) =>
-        `${left.suite ?? "default"}/${left.name}`.localeCompare(`${right.suite ?? "default"}/${right.name}`)
+        `${left.suite ?? "default"}/${left.name}`.localeCompare(
+          `${right.suite ?? "default"}/${right.name}`,
+        ),
       );
     } catch {
       return [];
@@ -399,25 +362,21 @@ export class EvidenceStore {
   async findVisualBaseline(
     session: DesktopSession,
     name: string,
-    suite = "default"
+    suite = "default",
   ): Promise<VisualBaselineRef | undefined> {
     const baselineName = sanitizeBaselinePart(name, "baseline name");
     const baselineSuite = sanitizeBaselinePart(suite, "baseline suite");
     const baselines = await this.listVisualBaselines(session, {
-      suite: baselineSuite
+      suite: baselineSuite,
     });
     return baselines.find((baseline) => baseline.name === baselineName);
   }
 
   async createAnnotation(
     session: DesktopSession,
-    input: CreateAnnotationInput
+    input: CreateAnnotationInput,
   ): Promise<ScreenshotAnnotation> {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     validateAnnotationInput(input);
 
     const screenshotPath = this.getScreenshotFilePath(session, input.screenshotFileName);
@@ -433,7 +392,11 @@ export class EvidenceStore {
     if (input.cropPngBase64) {
       const cropBuffer = parsePngBase64(input.cropPngBase64);
       cropPath = join(paths.annotationsPath, `${id}-crop.png`);
-      assertPathInside(paths.annotationsPath, cropPath, "Crop path is outside the session evidence directory.");
+      assertPathInside(
+        paths.annotationsPath,
+        cropPath,
+        "Crop path is outside the session evidence directory.",
+      );
       await writeFile(cropPath, cropBuffer);
     }
 
@@ -452,7 +415,7 @@ export class EvidenceStore {
       note: input.note.trim(),
       color: input.color,
       cropPath,
-      createdAt: isoNow()
+      createdAt: isoNow(),
     };
 
     await appendJsonLine(paths.annotationsJsonlPath, annotation);
@@ -461,11 +424,7 @@ export class EvidenceStore {
   }
 
   async listAnnotations(session: DesktopSession): Promise<ScreenshotAnnotation[]> {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     try {
       const contents = await readFile(paths.annotationsJsonlPath, "utf8");
       return contents
@@ -478,11 +437,7 @@ export class EvidenceStore {
   }
 
   async getVisualHandoff(session: DesktopSession): Promise<VisualHandoff> {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     if (!(await pathExists(paths.visualHandoffPath))) {
       return await this.regenerateVisualHandoff(session);
     }
@@ -491,16 +446,12 @@ export class EvidenceStore {
       sessionId: session.id,
       path: paths.visualHandoffPath,
       text: await readFile(paths.visualHandoffPath, "utf8"),
-      annotations: await this.listAnnotations(session)
+      annotations: await this.listAnnotations(session),
     };
   }
 
   async regenerateVisualHandoff(session: DesktopSession): Promise<VisualHandoff> {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     const annotations = await this.listAnnotations(session);
     const visualAssertions = await this.listVisualAssertions(session);
     const text = renderVisualHandoff(session, paths.sessionPath, annotations, visualAssertions);
@@ -509,25 +460,21 @@ export class EvidenceStore {
       sessionId: session.id,
       path: paths.visualHandoffPath,
       text,
-      annotations
+      annotations,
     };
   }
 
   async writeReport(session: DesktopSession): Promise<void> {
-    const paths = this.getPaths(
-      session.workspacePath,
-      session.id,
-      session.config.evidenceRootPath
-    );
+    const paths = this.getPaths(session.workspacePath, session.id, session.config.evidenceRootPath);
     const actions = await readActionRecords(paths.actionsJsonlPath);
     const screenshots = await this.listScreenshots(session);
     const inputActions = actions.filter((action) => action.type.startsWith("input."));
     const windowActions = actions.filter((action) => action.type.startsWith("window."));
     const commandLaunches = actions.filter(
-      (action) => action.type === "app.launched" && action.status === "ok"
+      (action) => action.type === "app.launched" && action.status === "ok",
     );
     const stableActions = actions.filter(
-      (action) => action.type === "screen.wait_for_stable" && action.status === "ok"
+      (action) => action.type === "screen.wait_for_stable" && action.status === "ok",
     );
     const visualAssertions = await this.listVisualAssertions(session);
     const annotationCount = (await this.listAnnotations(session)).length;
@@ -568,14 +515,14 @@ export class EvidenceStore {
       "",
       "## Command Launches",
       "",
-      ...(commandLaunches.length > 0
-        ? commandLaunches.map(formatCommandLaunch)
-        : ["- None"]),
+      ...(commandLaunches.length > 0 ? commandLaunches.map(formatCommandLaunch) : ["- None"]),
       "",
       "## Screenshots",
       "",
       ...(screenshots.length > 0
-        ? screenshots.map((screenshot) => `- ${toEvidenceRelativePath(paths.sessionPath, screenshot.path)}`)
+        ? screenshots.map(
+            (screenshot) => `- ${toEvidenceRelativePath(paths.sessionPath, screenshot.path)}`,
+          )
         : ["- None"]),
       "",
       "## Stable Screen",
@@ -602,7 +549,7 @@ export class EvidenceStore {
       ...(session.warnings.length > 0
         ? session.warnings.map((warning) => `- Warning: ${warning}`)
         : ["- None"]),
-      ""
+      "",
     ];
 
     await writeTextAtomic(paths.reportPath, lines.join("\n"));
@@ -669,7 +616,10 @@ export function parsePngBase64(value: string): Buffer {
   if (buffer.length > MAX_CROP_BYTES) {
     throw new ProcessError("cropPngBase64 is too large.");
   }
-  if (buffer.length < PNG_SIGNATURE.length || !buffer.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
+  if (
+    buffer.length < PNG_SIGNATURE.length ||
+    !buffer.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)
+  ) {
     throw new ProcessError("cropPngBase64 must decode to a PNG image.");
   }
 
@@ -713,27 +663,32 @@ function formatStableScreenAction(sessionPath: string, action: ActionLogRecord):
     retainedScreenshots.length > 0
       ? `retained=${retainedScreenshots.map((path) => toEvidenceRelativePath(sessionPath, path)).join(",")}`
       : "retained=none",
-    details.reason ? `reason=${String(details.reason)}` : undefined
+    details.reason ? `reason=${String(details.reason)}` : undefined,
   ]
     .filter(Boolean)
     .join("; ");
 }
 
-function formatVisualAssertion(
-  sessionPath: string,
-  assertion: VisualCompareResult
-): string {
+function formatVisualAssertion(sessionPath: string, assertion: VisualCompareResult): string {
   return [
     `- ${assertion.kind ?? "compare"}`,
     assertion.label ? `label=${assertion.label}` : undefined,
-    assertion.baselineName ? `baseline=${assertion.baselineSuite ?? "default"}/${assertion.baselineName}` : undefined,
+    assertion.baselineName
+      ? `baseline=${assertion.baselineSuite ?? "default"}/${assertion.baselineName}`
+      : undefined,
     assertion.annotationId ? `annotation=${assertion.annotationId}` : undefined,
     `diffPixelRatio=${assertion.diffPixelRatio.toFixed(6)}`,
     `diffPixels=${assertion.diffPixels}/${assertion.comparedPixels}`,
     assertion.passed === undefined ? undefined : `passed=${String(assertion.passed)}`,
-    assertion.containmentPassed === undefined ? undefined : `containmentPassed=${String(assertion.containmentPassed)}`,
-    assertion.insideDiffPixelRatio === undefined ? undefined : `insideDiffPixelRatio=${assertion.insideDiffPixelRatio.toFixed(6)}`,
-    assertion.outsideDiffPixelRatio === undefined ? undefined : `outsideDiffPixelRatio=${assertion.outsideDiffPixelRatio.toFixed(6)}`,
+    assertion.containmentPassed === undefined
+      ? undefined
+      : `containmentPassed=${String(assertion.containmentPassed)}`,
+    assertion.insideDiffPixelRatio === undefined
+      ? undefined
+      : `insideDiffPixelRatio=${assertion.insideDiffPixelRatio.toFixed(6)}`,
+    assertion.outsideDiffPixelRatio === undefined
+      ? undefined
+      : `outsideDiffPixelRatio=${assertion.outsideDiffPixelRatio.toFixed(6)}`,
     assertion.region
       ? `region=x:${assertion.region.x},y:${assertion.region.y},w:${assertion.region.width},h:${assertion.region.height}`
       : "region=full",
@@ -742,7 +697,9 @@ function formatVisualAssertion(
       : undefined,
     `before=${toEvidenceRelativePath(sessionPath, assertion.beforePath)}`,
     `after=${toEvidenceRelativePath(sessionPath, assertion.afterPath)}`,
-    assertion.diffPath ? `diff=${toEvidenceRelativePath(sessionPath, assertion.diffPath)}` : "diff=none"
+    assertion.diffPath
+      ? `diff=${toEvidenceRelativePath(sessionPath, assertion.diffPath)}`
+      : "diff=none",
   ]
     .filter(Boolean)
     .join("; ");
@@ -764,7 +721,7 @@ function serializeSession(session: DesktopSession): Record<string, unknown> {
     evidencePath: session.evidencePath,
     processIds: session.processIds,
     warnings: session.warnings,
-    driverKind: session.driverKind
+    driverKind: session.driverKind,
   };
 }
 
@@ -832,13 +789,14 @@ function validateAnnotationInput(input: CreateAnnotationInput): void {
 }
 
 function nextAnnotationId(annotations: readonly ScreenshotAnnotation[]): string {
-  const next = annotations.reduce((max, annotation) => {
-    const match = /^ann_(\d+)$/.exec(annotation.id);
-    if (!match) {
-      return max;
-    }
-    return Math.max(max, Number.parseInt(match[1], 10));
-  }, 0) + 1;
+  const next =
+    annotations.reduce((max, annotation) => {
+      const match = /^ann_(\d+)$/.exec(annotation.id);
+      if (!match) {
+        return max;
+      }
+      return Math.max(max, Number.parseInt(match[1], 10));
+    }, 0) + 1;
   return `ann_${String(next).padStart(3, "0")}`;
 }
 
@@ -846,7 +804,7 @@ function renderVisualHandoff(
   session: DesktopSession,
   sessionPath: string,
   annotations: readonly ScreenshotAnnotation[],
-  visualAssertions: readonly VisualCompareResult[]
+  visualAssertions: readonly VisualCompareResult[],
 ): string {
   const lines = [
     "# Visual Handoff",
@@ -867,7 +825,7 @@ function renderVisualHandoff(
     "4. Rerun the GUI in Agent Desktop Harness.",
     "5. Capture a new screenshot.",
     "6. Compare before/after evidence.",
-    ""
+    "",
   ];
 
   if (annotations.length === 0) {
@@ -897,7 +855,7 @@ function renderVisualHandoff(
       "",
       "Agent instruction:",
       "Inspect the screenshot and crop. Fix the UI/game issue described by the human note. Prefer a minimal targeted change. After fixing, rerun the app and capture new evidence.",
-      ""
+      "",
     );
   }
 
@@ -938,7 +896,7 @@ function parseScreenshotFileName(fileName: string): {
   const sequence = Number.parseInt(match[1], 10);
   return {
     sequence: Number.isFinite(sequence) ? sequence : undefined,
-    label: match[2]
+    label: match[2],
   };
 }
 

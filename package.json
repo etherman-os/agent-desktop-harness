@@ -26,7 +26,9 @@
   "scripts": {
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint",
+    "lint": "biome check . --max-diagnostics=100",
+    "lint:fix": "biome check . --write --max-diagnostics=100",
+    "format": "biome format . --write",
     "test": "pnpm --filter @agent-desktop-harness/core test && pnpm --filter @agent-desktop-harness/cli test && pnpm --filter @agent-desktop-harness/mcp-server test && pnpm --filter @agent-desktop-harness/http-server test",
     "smoke:x11": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-x11",
     "smoke:http": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-http",
@@ -42,9 +44,11 @@
     "smoke:visual-qa": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-visual-qa",
     "smoke:visual-baseline": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-visual-baseline",
     "smoke:observer": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-observer",
+    "smoke:studio-capture-contract": "pnpm --filter @agent-desktop-harness/cli dev -- smoke-studio-capture-contract",
     "smoke:all": "pnpm smoke:x11 && pnpm smoke:http && pnpm smoke:mcp"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.16",
     "@types/node": "^22.15.3",
     "typescript": "^5.8.3"
   }

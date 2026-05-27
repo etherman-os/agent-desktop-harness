@@ -1,9 +1,9 @@
 import type {
+  AppActionResult,
+  AppRef,
   BrowserActionResult,
   BrowserPageRef,
   DesktopSession,
-  AppActionResult,
-  AppRef,
   DriverRouteDecision,
   DriverRouterStatus,
   ElectronActionResult,
@@ -22,7 +22,7 @@ import type {
   VisualBaselineRef,
   VisualCompareResult,
   VisualHandoff,
-  WaitForStableScreenResult
+  WaitForStableScreenResult,
 } from "@agent-desktop-harness/core";
 
 export function serializeSession(session: DesktopSession): Record<string, unknown> {
@@ -40,7 +40,7 @@ export function serializeSession(session: DesktopSession): Record<string, unknow
     createdAt: session.createdAt.toISOString(),
     stoppedAt: session.stoppedAt?.toISOString(),
     processIds: session.processIds,
-    warnings: session.warnings
+    warnings: session.warnings,
   };
 }
 
@@ -52,7 +52,7 @@ export function serializeLaunchResult(result: LaunchResult): Record<string, unkn
     args: result.args,
     cwd: result.cwd,
     display: result.display,
-    startedAt: result.startedAt.toISOString()
+    startedAt: result.startedAt.toISOString(),
   };
 }
 
@@ -67,20 +67,18 @@ export function serializeScreenshot(result: ScreenshotResult): Record<string, un
     createdAt: result.createdAt.toISOString(),
     display: result.display,
     sequence: result.sequence,
-    label: result.label
+    label: result.label,
   };
 }
 
-export function serializeScreenshotArtifact(
-  artifact: ScreenshotArtifact
-): Record<string, unknown> {
+export function serializeScreenshotArtifact(artifact: ScreenshotArtifact): Record<string, unknown> {
   return {
     sessionId: artifact.sessionId,
     fileName: artifact.fileName,
     path: artifact.path,
     sequence: artifact.sequence,
     label: artifact.label,
-    createdAt: artifact.createdAt
+    createdAt: artifact.createdAt,
   };
 }
 
@@ -90,33 +88,29 @@ export function serializeBrowserPageRef(page: BrowserPageRef): Record<string, un
     pageId: page.pageId,
     url: page.url,
     title: page.title,
-    createdAt: page.createdAt
+    createdAt: page.createdAt,
   };
 }
 
-export function serializeBrowserActionResult(
-  result: BrowserActionResult
-): Record<string, unknown> {
+export function serializeBrowserActionResult(result: BrowserActionResult): Record<string, unknown> {
   return {
     sessionId: result.sessionId,
     pageId: result.pageId,
     actionType: result.actionType,
     success: result.success,
     createdAt: result.createdAt,
-    details: result.details
+    details: result.details,
   };
 }
 
-export function serializeTauriDriverStatus(
-  status: TauriDriverStatus
-): Record<string, unknown> {
+export function serializeTauriDriverStatus(status: TauriDriverStatus): Record<string, unknown> {
   return {
     available: status.available,
     tauriDriverPath: status.tauriDriverPath,
     webKitWebDriverPath: status.webKitWebDriverPath,
     cargoPath: status.cargoPath,
     warnings: status.warnings,
-    errors: status.errors
+    errors: status.errors,
   };
 }
 
@@ -128,13 +122,11 @@ export function serializeTauriAppRef(app: TauriAppRef): Record<string, unknown> 
     processId: app.processId,
     createdAt: app.createdAt,
     mode: app.mode,
-    warnings: app.warnings
+    warnings: app.warnings,
   };
 }
 
-export function serializeTauriActionResult(
-  result: TauriActionResult
-): Record<string, unknown> {
+export function serializeTauriActionResult(result: TauriActionResult): Record<string, unknown> {
   return {
     sessionId: result.sessionId,
     appId: result.appId,
@@ -143,19 +135,19 @@ export function serializeTauriActionResult(
     mode: result.mode,
     createdAt: result.createdAt,
     details: result.details,
-    warnings: result.warnings
+    warnings: result.warnings,
   };
 }
 
 export function serializeElectronDriverStatus(
-  status: ElectronDriverStatus
+  status: ElectronDriverStatus,
 ): Record<string, unknown> {
   return {
     available: status.available,
     playwrightAvailable: status.playwrightAvailable,
     electronBinaryPath: status.electronBinaryPath,
     warnings: status.warnings,
-    errors: status.errors
+    errors: status.errors,
   };
 }
 
@@ -167,12 +159,12 @@ export function serializeElectronAppRef(app: ElectronAppRef): Record<string, unk
     mode: app.mode,
     processId: app.processId,
     windowTitle: app.windowTitle,
-    warnings: app.warnings
+    warnings: app.warnings,
   };
 }
 
 export function serializeElectronActionResult(
-  result: ElectronActionResult
+  result: ElectronActionResult,
 ): Record<string, unknown> {
   return {
     sessionId: result.sessionId,
@@ -182,13 +174,11 @@ export function serializeElectronActionResult(
     mode: result.mode,
     createdAt: result.createdAt,
     details: result.details,
-    warnings: result.warnings
+    warnings: result.warnings,
   };
 }
 
-export function serializeLiveObserverStatus(
-  status: LiveObserverStatus
-): Record<string, unknown> {
+export function serializeLiveObserverStatus(status: LiveObserverStatus): Record<string, unknown> {
   return {
     available: status.available,
     x11vncPath: status.x11vncPath,
@@ -198,13 +188,11 @@ export function serializeLiveObserverStatus(
     noVncWebRootPath: status.noVncWebRootPath,
     warnings: status.warnings,
     errors: status.errors,
-    installHints: status.installHints
+    installHints: status.installHints,
   };
 }
 
-export function serializeLiveObserverRef(
-  observer: LiveObserverRef
-): Record<string, unknown> {
+export function serializeLiveObserverRef(observer: LiveObserverRef): Record<string, unknown> {
   return {
     sessionId: observer.sessionId,
     observerId: observer.observerId,
@@ -214,23 +202,21 @@ export function serializeLiveObserverRef(
     viewOnly: observer.viewOnly,
     url: observer.url,
     createdAt: observer.createdAt,
-    warnings: observer.warnings
+    warnings: observer.warnings,
   };
 }
 
-export function serializeDriverRouterStatus(
-  status: DriverRouterStatus
-): Record<string, unknown> {
+export function serializeDriverRouterStatus(status: DriverRouterStatus): Record<string, unknown> {
   return {
     browser: status.browser,
     tauri: status.tauri,
     electron: status.electron,
-    x11Fallback: status.x11Fallback
+    x11Fallback: status.x11Fallback,
   };
 }
 
 export function serializeDriverRouteDecision(
-  decision: DriverRouteDecision
+  decision: DriverRouteDecision,
 ): Record<string, unknown> {
   return {
     appKind: decision.appKind,
@@ -240,7 +226,7 @@ export function serializeDriverRouteDecision(
     fallbackUsed: decision.fallbackUsed,
     fallbackReason: decision.fallbackReason,
     warnings: decision.warnings,
-    errors: decision.errors
+    errors: decision.errors,
   };
 }
 
@@ -254,13 +240,11 @@ export function serializeAppRef(app: AppRef): Record<string, unknown> {
     fallbackUsed: app.fallbackUsed,
     createdAt: app.createdAt,
     processId: app.processId,
-    warnings: app.warnings
+    warnings: app.warnings,
   };
 }
 
-export function serializeAppActionResult(
-  result: AppActionResult
-): Record<string, unknown> {
+export function serializeAppActionResult(result: AppActionResult): Record<string, unknown> {
   return {
     sessionId: result.sessionId,
     appId: result.appId,
@@ -272,13 +256,11 @@ export function serializeAppActionResult(
     success: result.success,
     createdAt: result.createdAt,
     warnings: result.warnings,
-    details: result.details
+    details: result.details,
   };
 }
 
-export function serializeVisualCompareResult(
-  result: VisualCompareResult
-): Record<string, unknown> {
+export function serializeVisualCompareResult(result: VisualCompareResult): Record<string, unknown> {
   return {
     sessionId: result.sessionId,
     label: result.label,
@@ -311,13 +293,11 @@ export function serializeVisualCompareResult(
     containmentPassed: result.containmentPassed,
     passed: result.passed,
     createdAt: result.createdAt,
-    warnings: result.warnings
+    warnings: result.warnings,
   };
 }
 
-export function serializeVisualBaseline(
-  baseline: VisualBaselineRef
-): Record<string, unknown> {
+export function serializeVisualBaseline(baseline: VisualBaselineRef): Record<string, unknown> {
   return {
     name: baseline.name,
     suite: baseline.suite,
@@ -327,13 +307,11 @@ export function serializeVisualBaseline(
     height: baseline.height,
     createdAt: baseline.createdAt,
     updatedAt: baseline.updatedAt,
-    metadata: baseline.metadata
+    metadata: baseline.metadata,
   };
 }
 
-export function serializeAnnotation(
-  annotation: ScreenshotAnnotation
-): Record<string, unknown> {
+export function serializeAnnotation(annotation: ScreenshotAnnotation): Record<string, unknown> {
   return {
     id: annotation.id,
     sessionId: annotation.sessionId,
@@ -349,7 +327,7 @@ export function serializeAnnotation(
     note: annotation.note,
     color: annotation.color,
     cropPath: annotation.cropPath,
-    createdAt: annotation.createdAt
+    createdAt: annotation.createdAt,
   };
 }
 
@@ -358,12 +336,12 @@ export function serializeVisualHandoff(handoff: VisualHandoff): Record<string, u
     sessionId: handoff.sessionId,
     path: handoff.path,
     text: handoff.text,
-    annotations: handoff.annotations.map(serializeAnnotation)
+    annotations: handoff.annotations.map(serializeAnnotation),
   };
 }
 
 export function serializeWaitForStableScreenResult(
-  result: WaitForStableScreenResult
+  result: WaitForStableScreenResult,
 ): Record<string, unknown> {
   return {
     sessionId: result.sessionId,
@@ -373,23 +351,21 @@ export function serializeWaitForStableScreenResult(
     mode: result.mode,
     retainedScreenshots: result.retainedScreenshots?.map(serializeScreenshot),
     discardedScreenshotCount: result.discardedScreenshotCount,
-    lastScreenshot: result.lastScreenshot
-      ? serializeScreenshot(result.lastScreenshot)
-      : undefined,
-    reason: result.reason
+    lastScreenshot: result.lastScreenshot ? serializeScreenshot(result.lastScreenshot) : undefined,
+    reason: result.reason,
   };
 }
 
 export function redactTypeTextResult(
   result: InputActionResult,
-  textLength: number
+  textLength: number,
 ): InputActionResult {
   return {
     ...result,
     details: {
       redacted: true,
-      textLength
-    }
+      textLength,
+    },
   };
 }
 

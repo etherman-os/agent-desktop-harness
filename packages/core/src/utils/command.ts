@@ -1,8 +1,8 @@
-import { delimiter, isAbsolute, join } from "node:path";
-import { spawn } from "node:child_process";
 import type { ChildProcess, SpawnOptionsWithoutStdio } from "node:child_process";
-import { isExecutable } from "./fs.js";
+import { spawn } from "node:child_process";
+import { delimiter, isAbsolute, join } from "node:path";
 import { MissingDependencyError, ProcessError } from "../errors.js";
+import { isExecutable } from "./fs.js";
 
 const SENSITIVE_ENV_NAME = /(TOKEN|SECRET|PASSWORD|PASS|CREDENTIAL|AUTH|COOKIE)/i;
 
@@ -14,18 +14,15 @@ export type CommandResult = {
 export type CommandRunner = (
   command: string,
   args: readonly string[],
-  options?: SpawnOptionsWithoutStdio
+  options?: SpawnOptionsWithoutStdio,
 ) => Promise<CommandResult>;
 
-export type DependencyChecker = (
-  command: string,
-  installHint: string
-) => Promise<void>;
+export type DependencyChecker = (command: string, installHint: string) => Promise<void>;
 
 export async function findExecutableOnPath(
   command: string,
   env: NodeJS.ProcessEnv = process.env,
-  cwd: string = process.cwd()
+  cwd: string = process.cwd(),
 ): Promise<string | undefined> {
   if (command.includes("/") || isAbsolute(command)) {
     const candidate = isAbsolute(command) ? command : join(cwd, command);
@@ -47,10 +44,7 @@ export async function findExecutableOnPath(
   return undefined;
 }
 
-export async function assertExecutableOnPath(
-  command: string,
-  installHint: string
-): Promise<void> {
+export async function assertExecutableOnPath(command: string, installHint: string): Promise<void> {
   const executable = await findExecutableOnPath(command);
   if (!executable) {
     throw new MissingDependencyError(command, installHint);
@@ -58,7 +52,7 @@ export async function assertExecutableOnPath(
 }
 
 export function createSanitizedEnvironment(
-  overrides: Readonly<Record<string, string | undefined>> = {}
+  overrides: Readonly<Record<string, string | undefined>> = {},
 ): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
 
@@ -78,10 +72,7 @@ export function createSanitizedEnvironment(
   return env;
 }
 
-export async function waitForSpawn(
-  child: ChildProcess,
-  command: string
-): Promise<void> {
+export async function waitForSpawn(child: ChildProcess, command: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const cleanup = (): void => {
       child.off("spawn", onSpawn);
@@ -104,9 +95,9 @@ export async function waitForSpawn(
       reject(
         new ProcessError(
           `Command "${command}" exited before it was ready (code=${String(
-            code
-          )}, signal=${String(signal)}).`
-        )
+            code,
+          )}, signal=${String(signal)}).`,
+        ),
       );
     };
 
@@ -119,13 +110,13 @@ export async function waitForSpawn(
 export async function runCommand(
   command: string,
   args: readonly string[],
-  options: SpawnOptionsWithoutStdio = {}
+  options: SpawnOptionsWithoutStdio = {},
 ): Promise<CommandResult> {
   return await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       ...options,
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
     let stdout = "";
@@ -153,9 +144,9 @@ export async function runCommand(
       reject(
         new ProcessError(
           `Command "${command}" failed (code=${String(code)}, signal=${String(
-            signal
-          )}): ${stderr.trim()}`
-        )
+            signal,
+          )}): ${stderr.trim()}`,
+        ),
       );
     });
   });

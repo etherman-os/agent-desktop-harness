@@ -1,8 +1,14 @@
-import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
-import { assertExecutableOnPath, createSanitizedEnvironment, findExecutableOnPath, runCommand, waitForSpawn } from "../utils/command.js";
-import { terminateProcessTree } from "../session/processTree.js";
+import { spawn } from "node:child_process";
 import { ProcessError } from "../errors.js";
+import { terminateProcessTree } from "../session/processTree.js";
+import {
+  assertExecutableOnPath,
+  createSanitizedEnvironment,
+  findExecutableOnPath,
+  runCommand,
+  waitForSpawn,
+} from "../utils/command.js";
 
 export interface XvfbDisplayOptions {
   readonly display: string;
@@ -24,13 +30,10 @@ export interface StartedXvfbDisplay {
 
 export class XvfbDisplay {
   async start(options: XvfbDisplayOptions): Promise<StartedXvfbDisplay> {
-    await assertExecutableOnPath(
-      "Xvfb",
-      "Install Xvfb, for example: sudo apt install -y xvfb"
-    );
+    await assertExecutableOnPath("Xvfb", "Install Xvfb, for example: sudo apt install -y xvfb");
     await assertExecutableOnPath(
       "xdpyinfo",
-      "Install x11-utils, for example: sudo apt install -y x11-utils"
+      "Install x11-utils, for example: sudo apt install -y x11-utils",
     );
 
     const xvfbProcess = spawn(
@@ -41,14 +44,14 @@ export class XvfbDisplay {
         "0",
         `${options.width}x${options.height}x${options.depth}`,
         "-nolisten",
-        "tcp"
+        "tcp",
       ],
       {
         detached: true,
         env: createSanitizedEnvironment(),
         shell: false,
-        stdio: "ignore"
-      }
+        stdio: "ignore",
+      },
     );
 
     await waitForSpawn(xvfbProcess, "Xvfb");
@@ -70,7 +73,7 @@ export class XvfbDisplay {
       depth: options.depth,
       xvfbProcess,
       windowManagerProcess,
-      warnings
+      warnings,
     };
   }
 
@@ -81,7 +84,7 @@ export class XvfbDisplay {
     while (Date.now() < deadline) {
       try {
         await runCommand("xdpyinfo", ["-display", display], {
-          env: createSanitizedEnvironment({ DISPLAY: display })
+          env: createSanitizedEnvironment({ DISPLAY: display }),
         });
         return;
       } catch (error) {
@@ -92,13 +95,13 @@ export class XvfbDisplay {
 
     throw new ProcessError(
       `Xvfb started but display ${display} did not become ready within ${timeoutMs}ms.`,
-      lastError
+      lastError,
     );
   }
 
   private async tryStartWindowManager(
     display: string,
-    warnings: string[]
+    warnings: string[],
   ): Promise<ChildProcess | undefined> {
     const openboxPath = await findExecutableOnPath("openbox");
     if (!openboxPath) {
@@ -110,7 +113,7 @@ export class XvfbDisplay {
       detached: true,
       env: createSanitizedEnvironment({ DISPLAY: display }),
       shell: false,
-      stdio: "ignore"
+      stdio: "ignore",
     });
 
     try {
@@ -125,7 +128,7 @@ export class XvfbDisplay {
       warnings.push(
         `openbox could not be started; continuing without a window manager: ${
           error instanceof Error ? error.message : String(error)
-        }`
+        }`,
       );
       return undefined;
     }

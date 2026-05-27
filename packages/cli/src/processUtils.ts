@@ -1,5 +1,5 @@
-import { spawn } from "node:child_process";
 import type { ChildProcess, SpawnOptionsWithoutStdio } from "node:child_process";
+import { spawn } from "node:child_process";
 
 export interface ProcessOutput {
   readonly stdout: string;
@@ -9,13 +9,13 @@ export interface ProcessOutput {
 export async function runProcess(
   command: string,
   args: readonly string[],
-  options: SpawnOptionsWithoutStdio = {}
+  options: SpawnOptionsWithoutStdio = {},
 ): Promise<ProcessOutput> {
   return await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       ...options,
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
     let stdout = "";
@@ -43,11 +43,11 @@ export async function runProcess(
             `Command failed: ${command} ${args.join(" ")}`,
             `Exit: code=${String(code)}, signal=${String(signal)}`,
             stderr.trim() ? `stderr:\n${stderr.trim()}` : undefined,
-            stdout.trim() ? `stdout:\n${stdout.trim()}` : undefined
+            stdout.trim() ? `stdout:\n${stdout.trim()}` : undefined,
           ]
             .filter(Boolean)
-            .join("\n")
-        )
+            .join("\n"),
+        ),
       );
     });
   });
@@ -56,7 +56,7 @@ export async function runProcess(
 export async function stopChildProcess(
   child: ChildProcess,
   name: string,
-  timeoutMs = 3000
+  timeoutMs = 3000,
 ): Promise<void> {
   if (child.exitCode !== null || child.signalCode !== null || child.killed) {
     return;
@@ -68,10 +68,7 @@ export async function stopChildProcess(
 
   child.kill("SIGTERM");
 
-  const stopped = await Promise.race([
-    exited.then(() => true),
-    delay(timeoutMs).then(() => false)
-  ]);
+  const stopped = await Promise.race([exited.then(() => true), delay(timeoutMs).then(() => false)]);
 
   if (stopped) {
     return;
@@ -82,7 +79,7 @@ export async function stopChildProcess(
     exited,
     delay(1000).then(() => {
       throw new Error(`${name} did not exit after SIGKILL.`);
-    })
+    }),
   ]);
 }
 
@@ -105,7 +102,7 @@ export function collectChildOutput(child: ChildProcess): ProcessOutput {
     },
     get stderr() {
       return stderr;
-    }
+    },
   };
 }
 

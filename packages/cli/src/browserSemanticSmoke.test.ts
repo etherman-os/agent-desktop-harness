@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   ensureBrowserSemanticSmokeReady,
-  parseSmokeBrowserSemanticArgs
+  parseSmokeBrowserSemanticArgs,
 } from "./browserSemanticSmoke.js";
 import type { DoctorReport } from "./doctor.js";
 
@@ -24,7 +24,7 @@ test("parseSmokeBrowserSemanticArgs accepts explicit ports and text", () => {
     "--http-port",
     "7365",
     "--text",
-    "semantic smoke message"
+    "semantic smoke message",
   ]);
 
   assert.equal(parsed.workspacePath, "/tmp/browser-semantic-smoke");
@@ -34,14 +34,8 @@ test("parseSmokeBrowserSemanticArgs accepts explicit ports and text", () => {
 });
 
 test("parseSmokeBrowserSemanticArgs validates port values", () => {
-  assert.throws(
-    () => parseSmokeBrowserSemanticArgs(["--vite-port", "0"]),
-    /Invalid port/
-  );
-  assert.throws(
-    () => parseSmokeBrowserSemanticArgs(["--http-port", "70000"]),
-    /Invalid port/
-  );
+  assert.throws(() => parseSmokeBrowserSemanticArgs(["--vite-port", "0"]), /Invalid port/);
+  assert.throws(() => parseSmokeBrowserSemanticArgs(["--http-port", "70000"]), /Invalid port/);
 });
 
 test("ensureBrowserSemanticSmokeReady fails when required dependencies are missing", () => {
@@ -53,13 +47,13 @@ test("ensureBrowserSemanticSmokeReady fails when required dependencies are missi
         name: "Xvfb",
         level: "required",
         installHint: "sudo apt install -y xvfb",
-        found: false
-      }
-    ]
+        found: false,
+      },
+    ],
   };
 
   assert.throws(
     () => ensureBrowserSemanticSmokeReady(report),
-    /Missing required dependencies: Xvfb/
+    /Missing required dependencies: Xvfb/,
   );
 });

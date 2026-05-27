@@ -1,9 +1,9 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import {
   findMatchingWindow,
   parseWmctrlLine,
-  parseWmctrlWindowList
+  parseWmctrlWindowList,
 } from "./WmctrlWindowBackend.js";
 import { findBestWindow, isDevtoolsWindow } from "./windowFilters.js";
 
@@ -17,9 +17,7 @@ test("parseWmctrlLine parses wmctrl -lp output", () => {
 });
 
 test("parseWmctrlLine parses wmctrl -lG -p output with geometry", () => {
-  const parsed = parseWmctrlLine(
-    "0x03a00007  0 12345  12  34  800  600 host Terminal Title"
-  );
+  const parsed = parseWmctrlLine("0x03a00007  0 12345  12  34  800  600 host Terminal Title");
 
   assert.equal(parsed.id, "0x03a00007");
   assert.equal(parsed.desktop, "0");
@@ -37,10 +35,9 @@ test("parseWmctrlWindowList returns an empty list for no windows", () => {
 
 test("findMatchingWindow supports id, pid, exact title, and title substring", () => {
   const windows = parseWmctrlWindowList(
-    [
-      "0x03a00007  0 12345 host Terminal Title",
-      "0x03a00008  0 23456 host Browser Window"
-    ].join("\n")
+    ["0x03a00007  0 12345 host Terminal Title", "0x03a00008  0 23456 host Browser Window"].join(
+      "\n",
+    ),
   );
 
   assert.equal(findMatchingWindow(windows, { id: "0x03A00007" })?.pid, 12345);
@@ -54,8 +51,8 @@ test("window filters exclude devtools and can prefer the largest match", () => {
     [
       "0x03a00007  0 12345  0  0  800  600 host Demo App",
       "0x03a00008  0 12345  0  0  300  200 host DevTools - Demo App",
-      "0x03a00009  0 12345  0  0  1200  800 host Demo App Main"
-    ].join("\n")
+      "0x03a00009  0 12345  0  0  1200  800 host Demo App Main",
+    ].join("\n"),
   );
 
   assert.equal(isDevtoolsWindow(windows[1]!), true);
@@ -63,8 +60,8 @@ test("window filters exclude devtools and can prefer the largest match", () => {
     findBestWindow(windows, {
       titleIncludes: "demo app",
       excludeDevtools: true,
-      preferLargest: true
+      preferLargest: true,
     })?.id,
-    "0x03a00009"
+    "0x03a00009",
   );
 });

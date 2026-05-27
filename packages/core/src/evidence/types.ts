@@ -1,16 +1,8 @@
-import type {
-  DesktopSession,
-  EvidenceArtifact,
-  InputAction,
-  ScreenshotResult
-} from "../types.js";
+import type { DesktopSession, EvidenceArtifact, InputAction, ScreenshotResult } from "../types.js";
 
 export interface EvidenceRecorder {
   recordSessionStarted(session: DesktopSession): Promise<EvidenceArtifact>;
-  recordInputAction(
-    session: DesktopSession,
-    action: InputAction
-  ): Promise<EvidenceArtifact>;
+  recordInputAction(session: DesktopSession, action: InputAction): Promise<EvidenceArtifact>;
   recordScreenshot(result: ScreenshotResult): Promise<EvidenceArtifact>;
   writeReport(session: DesktopSession): Promise<EvidenceReport>;
 }

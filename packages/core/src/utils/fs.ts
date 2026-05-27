@@ -1,8 +1,7 @@
-import { createHash } from "node:crypto";
-import { mkdir, rename, writeFile, appendFile, access, stat, readFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
+import { access, appendFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
-import { randomUUID } from "node:crypto";
 
 export async function ensureDirectory(path: string): Promise<void> {
   await mkdir(path, { recursive: true });
@@ -36,10 +35,7 @@ export async function hashFile(path: string): Promise<string> {
   return createHash("sha256").update(contents).digest("hex");
 }
 
-export async function writeJsonAtomic(
-  path: string,
-  value: unknown
-): Promise<void> {
+export async function writeJsonAtomic(path: string, value: unknown): Promise<void> {
   await writeTextAtomic(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 

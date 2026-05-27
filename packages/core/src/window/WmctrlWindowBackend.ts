@@ -1,19 +1,19 @@
+import { ProcessError } from "../errors.js";
 import type {
   DesktopSession,
   FocusWindowTarget,
   WindowActionResult,
-  WindowInfo
+  WindowInfo,
 } from "../types.js";
-import { ProcessError } from "../errors.js";
+import type { CommandRunner, DependencyChecker } from "../utils/command.js";
 import {
   assertExecutableOnPath,
   createSanitizedEnvironment,
-  runCommand
+  runCommand,
 } from "../utils/command.js";
-import type { CommandRunner, DependencyChecker } from "../utils/command.js";
 import { isoNow } from "../utils/time.js";
 import type { WindowBackend } from "./types.js";
-import { findBestWindow, filterWindows } from "./windowFilters.js";
+import { filterWindows, findBestWindow } from "./windowFilters.js";
 
 export interface WmctrlWindowBackendOptions {
   readonly commandRunner?: CommandRunner;
@@ -32,7 +32,7 @@ export class WmctrlWindowBackend implements WindowBackend {
   async getWindows(session: DesktopSession): Promise<WindowInfo[]> {
     await this.ensureWmctrl();
     const result = await this.commandRunner("wmctrl", ["-lG", "-p"], {
-      env: createSanitizedEnvironment({ DISPLAY: session.display })
+      env: createSanitizedEnvironment({ DISPLAY: session.display }),
     });
 
     return parseWmctrlWindowList(result.stdout);
@@ -40,7 +40,7 @@ export class WmctrlWindowBackend implements WindowBackend {
 
   async focusWindow(
     session: DesktopSession,
-    target: FocusWindowTarget
+    target: FocusWindowTarget,
   ): Promise<WindowActionResult> {
     const windows = await this.getWindows(session);
     const window = findMatchingWindow(windows, target);
@@ -51,22 +51,19 @@ export class WmctrlWindowBackend implements WindowBackend {
 
     await this.ensureWmctrl();
     await this.commandRunner("wmctrl", ["-ia", window.id], {
-      env: createSanitizedEnvironment({ DISPLAY: session.display })
+      env: createSanitizedEnvironment({ DISPLAY: session.display }),
     });
 
     return {
       sessionId: session.id,
       success: true,
       window,
-      createdAt: isoNow()
+      createdAt: isoNow(),
     };
   }
 
   private async ensureWmctrl(): Promise<void> {
-    await this.dependencyChecker(
-      "wmctrl",
-      "Install it with: sudo apt install -y wmctrl"
-    );
+    await this.dependencyChecker("wmctrl", "Install it with: sudo apt install -y wmctrl");
   }
 }
 
@@ -95,7 +92,7 @@ export function parseWmctrlLine(line: string): WindowInfo {
       width: parseOptionalInteger(widthValue),
       height: parseOptionalInteger(heightValue),
       title: rest,
-      raw: line
+      raw: line,
     };
   }
 
@@ -105,7 +102,7 @@ export function parseWmctrlLine(line: string): WindowInfo {
     return {
       id: "",
       title: "",
-      raw: line
+      raw: line,
     };
   }
 
@@ -117,13 +114,13 @@ export function parseWmctrlLine(line: string): WindowInfo {
     desktop,
     pid: Number.isFinite(pid) && pid >= 0 ? pid : undefined,
     title: rest,
-    raw: line
+    raw: line,
   };
 }
 
 export function findMatchingWindow(
   windows: readonly WindowInfo[],
-  target: FocusWindowTarget
+  target: FocusWindowTarget,
 ): WindowInfo | undefined {
   if (target.id) {
     const id = target.id.toLowerCase();

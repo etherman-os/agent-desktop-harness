@@ -1,18 +1,18 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import type { SpawnOptionsWithoutStdio } from "node:child_process";
+import test from "node:test";
 import type { DesktopSession } from "../types.js";
 import {
-  XdotoolInputBackend,
   makeTypeTextDetails,
   normalizeHotkeyKeys,
-  scrollDirectionToButton
+  scrollDirectionToButton,
+  XdotoolInputBackend,
 } from "./XdotoolInputBackend.js";
 
 const session: DesktopSession = {
   id: "session-input-test",
   config: {
-    workspacePath: "/tmp/session-input-test"
+    workspacePath: "/tmp/session-input-test",
   },
   driverKind: "unknown",
   status: "running",
@@ -25,17 +25,13 @@ const session: DesktopSession = {
   height: 900,
   depth: 24,
   processIds: {
-    apps: []
+    apps: [],
   },
-  warnings: []
+  warnings: [],
 };
 
 test("normalizeHotkeyKeys maps common aliases", () => {
-  assert.deepEqual(normalizeHotkeyKeys(["control", "shift", "r"]), [
-    "ctrl",
-    "shift",
-    "r"
-  ]);
+  assert.deepEqual(normalizeHotkeyKeys(["control", "shift", "r"]), ["ctrl", "shift", "r"]);
   assert.deepEqual(normalizeHotkeyKeys(["Escape"]), ["Escape"]);
   assert.deepEqual(normalizeHotkeyKeys(["alt", "Tab"]), ["alt", "Tab"]);
 });
@@ -58,22 +54,16 @@ test("typeText uses argument passing and targets the session display", async () 
     commandRunner: async (command, args, options) => {
       calls.push({ command, args, options });
       return { stdout: "", stderr: "" };
-    }
+    },
   });
 
   await backend.typeText(session, {
     text: "hello && rm -rf /",
-    label: "safe-args"
+    label: "safe-args",
   });
 
   assert.equal(calls[0]?.command, "xdotool");
-  assert.deepEqual(calls[0]?.args, [
-    "type",
-    "--delay",
-    "0",
-    "--",
-    "hello && rm -rf /"
-  ]);
+  assert.deepEqual(calls[0]?.args, ["type", "--delay", "0", "--", "hello && rm -rf /"]);
   assert.equal(calls[0]?.options?.env?.DISPLAY, ":90");
 });
 
@@ -81,7 +71,7 @@ test("makeTypeTextDetails redacts secret text", () => {
   const details = makeTypeTextDetails({
     text: "secret-value",
     secret: true,
-    label: "password"
+    label: "password",
   });
 
   assert.equal(details.redacted, true);

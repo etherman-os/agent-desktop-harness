@@ -1,11 +1,12 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import test from "node:test";
 import type {
+  AnnotationRegionResult,
   AppActionResult,
   AppRef,
   BrowserActionResult,
@@ -30,18 +31,17 @@ import type {
   TauriActionResult,
   TauriAppRef,
   TauriDriverStatus,
-  AnnotationRegionResult,
   VisualBaselineRef,
   VisualChangeContainmentResult,
   VisualCompareResult,
   VisualHandoff,
   WaitForStableScreenResult,
   WindowActionResult,
-  WindowInfo
+  WindowInfo,
 } from "@agent-desktop-harness/core";
 import { PolicyError } from "@agent-desktop-harness/core";
-import { createDesktopHarnessHttpServer } from "./server.js";
 import type { SessionManagerLike } from "./api.js";
+import { createDesktopHarnessHttpServer, isLoopbackHost, startHttpServer } from "./server.js";
 
 test("GET /health returns service status", async () => {
   await withServer(new MockSessionManager(), async (baseUrl) => {
@@ -53,13 +53,34 @@ test("GET /health returns service status", async () => {
   });
 });
 
+test("isLoopbackHost allows only local HTTP bind hosts", () => {
+  assert.equal(isLoopbackHost("127.0.0.1"), true);
+  assert.equal(isLoopbackHost("localhost"), true);
+  assert.equal(isLoopbackHost("::1"), true);
+  assert.equal(isLoopbackHost("[::1]"), true);
+  assert.equal(isLoopbackHost("0.0.0.0"), false);
+  assert.equal(isLoopbackHost("192.168.1.10"), false);
+});
+
+test("startHttpServer rejects public bind hosts", async () => {
+  await assert.rejects(
+    async () =>
+      await startHttpServer({
+        host: "0.0.0.0",
+        port: 0,
+        sessionManager: new MockSessionManager(),
+      }),
+    /HTTP server host must be loopback-only/,
+  );
+});
+
 test("POST /sessions validates request body", async () => {
   await withServer(new MockSessionManager(), async (baseUrl) => {
     const response = await requestJson(baseUrl, "/sessions", {
       method: "POST",
       body: {
-        width: 0
-      }
+        width: 0,
+      },
     });
 
     assert.equal(response.status, 400);
@@ -83,14 +104,14 @@ test("POST type-text redacts secret response details", async () => {
       method: "POST",
       body: {
         text: "secret-value",
-        secret: true
-      }
+        secret: true,
+      },
     });
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body.result.details, {
       redacted: true,
-      textLength: 12
+      textLength: 12,
     });
     assert.equal(JSON.stringify(response.body).includes("secret-value"), false);
   });
@@ -100,7 +121,7 @@ test("POST focus-window requires a selector", async () => {
   await withServer(new MockSessionManager(), async (baseUrl) => {
     const response = await requestJson(baseUrl, "/sessions/session-1/focus-window", {
       method: "POST",
-      body: {}
+      body: {},
     });
 
     assert.equal(response.status, 400);
@@ -114,8 +135,8 @@ test("POST wait-for-window returns a matching window", async () => {
       method: "POST",
       body: {
         titleIncludes: "Test",
-        excludeDevtools: true
-      }
+        excludeDevtools: true,
+      },
     });
 
     assert.equal(response.status, 200);
@@ -132,9 +153,9 @@ test("browser semantic routes return page, actions, screenshots, and close resul
         browserExecutablePath: "/usr/bin/google-chrome",
         viewport: {
           width: 1440,
-          height: 900
-        }
-      }
+          height: 900,
+        },
+      },
     });
     assert.equal(opened.status, 200);
     assert.equal(opened.body.page.pageId, "page-1");
@@ -144,8 +165,8 @@ test("browser semantic routes return page, actions, screenshots, and close resul
       body: {
         placeholder: "Type a message",
         value: "secret-value",
-        secret: true
-      }
+        secret: true,
+      },
     });
     assert.equal(fill.status, 200);
     assert.equal(JSON.stringify(fill.body).includes("secret-value"), false);
@@ -155,8 +176,8 @@ test("browser semantic routes return page, actions, screenshots, and close resul
       method: "POST",
       body: {
         role: "button",
-        name: "Save message"
-      }
+        name: "Save message",
+      },
     });
     assert.equal(click.status, 200);
     assert.equal(click.body.result.actionType, "browser.click");
@@ -164,15 +185,15 @@ test("browser semantic routes return page, actions, screenshots, and close resul
     const screenshot = await requestJson(baseUrl, "/sessions/session-1/browser/screenshot", {
       method: "POST",
       body: {
-        label: "semantic"
-      }
+        label: "semantic",
+      },
     });
     assert.equal(screenshot.status, 200);
     assert.equal(screenshot.body.screenshot.path, "/tmp/browser-screenshot.png");
 
     const closed = await requestJson(baseUrl, "/sessions/session-1/browser/close", {
       method: "POST",
-      body: {}
+      body: {},
     });
     assert.equal(closed.status, 200);
     assert.equal(closed.body.sessionId, "session-1");
@@ -183,7 +204,7 @@ test("browser click validates selector targets", async () => {
   await withServer(new MockSessionManager(), async (baseUrl) => {
     const response = await requestJson(baseUrl, "/sessions/session-1/browser/click", {
       method: "POST",
-      body: {}
+      body: {},
     });
 
     assert.equal(response.status, 400);
@@ -206,12 +227,15 @@ test("observer routes return status, start/list metadata, and stop result", asyn
         webPort: 6081,
         viewOnly: true,
         password: "secret-value",
-        label: "test-observer"
-      }
+        label: "test-observer",
+      },
     });
     assert.equal(started.status, 200);
     assert.equal(started.body.observer.observerId, "observer-1");
-    assert.equal(started.body.observer.url, "http://127.0.0.1:6081/vnc.html?autoconnect=1&resize=scale&view_only=1");
+    assert.equal(
+      started.body.observer.url,
+      "http://127.0.0.1:6081/vnc.html?autoconnect=1&resize=scale&view_only=1",
+    );
     assert.equal(JSON.stringify(started.body).includes("secret-value"), false);
 
     const listed = await requestJson(baseUrl, "/sessions/session-1/observers");
@@ -219,7 +243,7 @@ test("observer routes return status, start/list metadata, and stop result", asyn
     assert.equal(listed.body.observers.length, 1);
 
     const stopped = await requestJson(baseUrl, "/sessions/session-1/observers/observer-1", {
-      method: "DELETE"
+      method: "DELETE",
     });
     assert.equal(stopped.status, 200);
     assert.equal(stopped.body.result.stopped, true);
@@ -238,8 +262,8 @@ test("tauri experimental routes return status, fallback guidance, screenshots, a
       body: {
         command: "pnpm",
         args: ["tauri", "dev"],
-        cwd: "/tmp/agent-desktop-harness-http-test"
-      }
+        cwd: "/tmp/agent-desktop-harness-http-test",
+      },
     });
     assert.equal(opened.status, 200);
     assert.equal(opened.body.experimental, true);
@@ -250,8 +274,8 @@ test("tauri experimental routes return status, fallback guidance, screenshots, a
       method: "POST",
       body: {
         role: "button",
-        name: "Save message"
-      }
+        name: "Save message",
+      },
     });
     assert.equal(click.status, 200);
     assert.equal(click.body.experimental, true);
@@ -263,8 +287,8 @@ test("tauri experimental routes return status, fallback guidance, screenshots, a
       body: {
         placeholder: "Type a message",
         value: "secret-value",
-        secret: true
-      }
+        secret: true,
+      },
     });
     assert.equal(fill.status, 200);
     assert.equal(JSON.stringify(fill.body).includes("secret-value"), false);
@@ -273,15 +297,15 @@ test("tauri experimental routes return status, fallback guidance, screenshots, a
     const screenshot = await requestJson(baseUrl, "/sessions/session-1/tauri/screenshot", {
       method: "POST",
       body: {
-        label: "tauri-fallback"
-      }
+        label: "tauri-fallback",
+      },
     });
     assert.equal(screenshot.status, 200);
     assert.equal(screenshot.body.screenshot.path, "/tmp/tauri-screenshot.png");
 
     const closed = await requestJson(baseUrl, "/sessions/session-1/tauri/close", {
       method: "POST",
-      body: {}
+      body: {},
     });
     assert.equal(closed.status, 200);
     assert.equal(closed.body.experimental, true);
@@ -293,7 +317,7 @@ test("tauri click validates selector targets", async () => {
   await withServer(new MockSessionManager(), async (baseUrl) => {
     const response = await requestJson(baseUrl, "/sessions/session-1/tauri/click", {
       method: "POST",
-      body: {}
+      body: {},
     });
 
     assert.equal(response.status, 400);
@@ -313,8 +337,8 @@ test("electron experimental routes return status, semantic actions, screenshots,
       body: {
         command: "electron",
         args: ["."],
-        cwd: "/tmp/agent-desktop-harness-http-test"
-      }
+        cwd: "/tmp/agent-desktop-harness-http-test",
+      },
     });
     assert.equal(opened.status, 200);
     assert.equal(opened.body.experimental, true);
@@ -326,8 +350,8 @@ test("electron experimental routes return status, semantic actions, screenshots,
       body: {
         placeholder: "Type a message",
         value: "secret-value",
-        secret: true
-      }
+        secret: true,
+      },
     });
     assert.equal(fill.status, 200);
     assert.equal(JSON.stringify(fill.body).includes("secret-value"), false);
@@ -337,8 +361,8 @@ test("electron experimental routes return status, semantic actions, screenshots,
       method: "POST",
       body: {
         role: "button",
-        name: "Save message"
-      }
+        name: "Save message",
+      },
     });
     assert.equal(click.status, 200);
     assert.equal(click.body.result.actionType, "electron.click");
@@ -347,8 +371,8 @@ test("electron experimental routes return status, semantic actions, screenshots,
       method: "POST",
       body: {
         selector: "#message-input",
-        key: "Enter"
-      }
+        key: "Enter",
+      },
     });
     assert.equal(press.status, 200);
     assert.equal(press.body.result.actionType, "electron.press");
@@ -356,15 +380,15 @@ test("electron experimental routes return status, semantic actions, screenshots,
     const screenshot = await requestJson(baseUrl, "/sessions/session-1/electron/screenshot", {
       method: "POST",
       body: {
-        label: "electron-semantic"
-      }
+        label: "electron-semantic",
+      },
     });
     assert.equal(screenshot.status, 200);
     assert.equal(screenshot.body.screenshot.path, "/tmp/electron-screenshot.png");
 
     const closed = await requestJson(baseUrl, "/sessions/session-1/electron/close", {
       method: "POST",
-      body: {}
+      body: {},
     });
     assert.equal(closed.status, 200);
     assert.equal(closed.body.experimental, true);
@@ -376,7 +400,7 @@ test("electron click validates selector targets", async () => {
   await withServer(new MockSessionManager(), async (baseUrl) => {
     const response = await requestJson(baseUrl, "/sessions/session-1/electron/click", {
       method: "POST",
-      body: {}
+      body: {},
     });
 
     assert.equal(response.status, 400);
@@ -394,8 +418,8 @@ test("driver router routes return status, decisions, app actions, screenshots, a
       method: "POST",
       body: {
         appKind: "browser",
-        requireSemantic: true
-      }
+        requireSemantic: true,
+      },
     });
     assert.equal(decision.status, 200);
     assert.equal(decision.body.decision.selectedDriver, "browser-playwright");
@@ -406,8 +430,8 @@ test("driver router routes return status, decisions, app actions, screenshots, a
       body: {
         appKind: "browser",
         url: "http://127.0.0.1:5179",
-        requireSemantic: true
-      }
+        requireSemantic: true,
+      },
     });
     assert.equal(opened.status, 200);
     assert.equal(opened.body.app.appId, "app-1");
@@ -418,8 +442,8 @@ test("driver router routes return status, decisions, app actions, screenshots, a
       body: {
         placeholder: "Type a message",
         value: "secret-value",
-        secret: true
-      }
+        secret: true,
+      },
     });
     assert.equal(fill.status, 200);
     assert.equal(fill.body.result.actionType, "app.fill");
@@ -430,8 +454,8 @@ test("driver router routes return status, decisions, app actions, screenshots, a
       method: "POST",
       body: {
         role: "button",
-        name: "Save message"
-      }
+        name: "Save message",
+      },
     });
     assert.equal(click.status, 200);
     assert.equal(click.body.result.selectedDriver, "browser-playwright");
@@ -439,8 +463,8 @@ test("driver router routes return status, decisions, app actions, screenshots, a
     const asserted = await requestJson(baseUrl, "/sessions/session-1/apps/assert-text", {
       method: "POST",
       body: {
-        text: "Status: saved"
-      }
+        text: "Status: saved",
+      },
     });
     assert.equal(asserted.status, 200);
     assert.equal(asserted.body.result.semantic, true);
@@ -448,15 +472,15 @@ test("driver router routes return status, decisions, app actions, screenshots, a
     const screenshot = await requestJson(baseUrl, "/sessions/session-1/apps/screenshot", {
       method: "POST",
       body: {
-        label: "router"
-      }
+        label: "router",
+      },
     });
     assert.equal(screenshot.status, 200);
     assert.equal(screenshot.body.screenshot.path, "/tmp/app-screenshot.png");
 
     const closed = await requestJson(baseUrl, "/sessions/session-1/apps/close", {
       method: "POST",
-      body: {}
+      body: {},
     });
     assert.equal(closed.status, 200);
     assert.equal(closed.body.success, true);
@@ -470,7 +494,7 @@ test("visual QA routes return comparison metadata, assertions, and diff PNGs", a
   await mkdir(join(tempRoot, "visual-diffs"), { recursive: true });
   await writeFile(
     manager.visualDiffFilePath,
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
   );
 
   try {
@@ -481,8 +505,8 @@ test("visual QA routes return comparison metadata, assertions, and diff PNGs", a
           beforePath: "screenshots/0001-before.png",
           afterPath: "screenshots/0002-after.png",
           label: "router",
-          createDiffImage: true
-        }
+          createDiffImage: true,
+        },
       });
       assert.equal(compare.status, 200);
       assert.equal(compare.body.result.kind, "compare");
@@ -493,8 +517,8 @@ test("visual QA routes return comparison metadata, assertions, and diff PNGs", a
         body: {
           beforePath: "screenshots/0001-before.png",
           afterPath: "screenshots/0002-after.png",
-          minDiffPixelRatio: 0.01
-        }
+          minDiffPixelRatio: 0.01,
+        },
       });
       assert.equal(changed.status, 200);
       assert.equal(changed.body.result.passed, true);
@@ -504,8 +528,8 @@ test("visual QA routes return comparison metadata, assertions, and diff PNGs", a
         body: {
           beforePath: "screenshots/0001-before.png",
           afterPath: "screenshots/0002-after.png",
-          maxDiffPixelRatio: 0.1
-        }
+          maxDiffPixelRatio: 0.1,
+        },
       });
       assert.equal(similar.status, 200);
       assert.equal(similar.body.result.passed, true);
@@ -516,13 +540,16 @@ test("visual QA routes return comparison metadata, assertions, and diff PNGs", a
           screenshotPath: "screenshots/0001-before.png",
           name: "sample-vite-clean",
           suite: "smoke",
-          overwrite: true
-        }
+          overwrite: true,
+        },
       });
       assert.equal(savedBaseline.status, 200);
       assert.equal(savedBaseline.body.baseline.name, "sample-vite-clean");
 
-      const baselines = await requestJson(baseUrl, "/sessions/session-1/visual/baselines?suite=smoke");
+      const baselines = await requestJson(
+        baseUrl,
+        "/sessions/session-1/visual/baselines?suite=smoke",
+      );
       assert.equal(baselines.status, 200);
       assert.equal(baselines.body.baselines[0].suite, "smoke");
 
@@ -535,9 +562,9 @@ test("visual QA routes return comparison metadata, assertions, and diff PNGs", a
             screenshotPath: "screenshots/0002-after.png",
             baselineName: "sample-vite-clean",
             suite: "smoke",
-            createDiffImage: true
-          }
-        }
+            createDiffImage: true,
+          },
+        },
       );
       assert.equal(baselineCompare.status, 200);
       assert.equal(baselineCompare.body.result.kind, "compare-baseline");
@@ -550,9 +577,9 @@ test("visual QA routes return comparison metadata, assertions, and diff PNGs", a
           body: {
             annotationId: "ann_001",
             afterPath: "screenshots/0002-after.png",
-            minDiffPixelRatio: 0.01
-          }
-        }
+            minDiffPixelRatio: 0.01,
+          },
+        },
       );
       assert.equal(annotationChanged.status, 200);
       assert.equal(annotationChanged.body.result.annotationId, "ann_001");
@@ -570,12 +597,12 @@ test("visual QA routes return comparison metadata, assertions, and diff PNGs", a
                 x: 1,
                 y: 2,
                 width: 3,
-                height: 4
-              }
+                height: 4,
+              },
             ],
-            maxOutsideDiffPixelRatio: 0
-          }
-        }
+            maxOutsideDiffPixelRatio: 0,
+          },
+        },
       );
       assert.equal(contained.status, 200);
       assert.equal(contained.body.result.containmentPassed, true);
@@ -598,7 +625,7 @@ test("app click validates router targets", async () => {
   await withServer(new MockSessionManager(), async (baseUrl) => {
     const response = await requestJson(baseUrl, "/sessions/session-1/apps/click", {
       method: "POST",
-      body: {}
+      body: {},
     });
 
     assert.equal(response.status, 400);
@@ -614,8 +641,8 @@ test("policy errors map to 403", async () => {
     const response = await requestJson(baseUrl, "/sessions/session-1/launch", {
       method: "POST",
       body: {
-        command: "xterm"
-      }
+        command: "xterm",
+      },
     });
 
     assert.equal(response.status, 403);
@@ -646,8 +673,8 @@ test("POST annotations validates traversal and returns annotation", async () => 
         y: 2,
         width: 3,
         height: 4,
-        note: "bad path"
-      }
+        note: "bad path",
+      },
     });
     assert.equal(bad.status, 400);
 
@@ -660,8 +687,8 @@ test("POST annotations validates traversal and returns annotation", async () => 
         y: 2,
         width: 3,
         height: 4,
-        note: "Button overlaps this text."
-      }
+        note: "Button overlaps this text.",
+      },
     });
     assert.equal(good.status, 200);
     assert.equal(good.body.annotation.id, "ann_001");
@@ -681,7 +708,7 @@ test("GET annotation UI returns local HTML", async () => {
 
 async function withServer(
   sessionManager: SessionManagerLike,
-  callback: (baseUrl: string) => Promise<void>
+  callback: (baseUrl: string) => Promise<void>,
 ): Promise<void> {
   const server = createDesktopHarnessHttpServer({ sessionManager });
   await new Promise<void>((resolve) => {
@@ -714,15 +741,15 @@ async function requestJson(
   options: {
     readonly method?: string;
     readonly body?: unknown;
-  } = {}
+  } = {},
 ): Promise<{ readonly status: number; readonly body: Record<string, any> }> {
   const init: RequestInit = {
-    method: options.method ?? "GET"
+    method: options.method ?? "GET",
   };
 
   if (options.body !== undefined) {
     init.headers = {
-      "content-type": "application/json"
+      "content-type": "application/json",
     };
     init.body = JSON.stringify(options.body);
   }
@@ -730,13 +757,13 @@ async function requestJson(
   const response = await fetch(`${baseUrl}${path}`, init);
   return {
     status: response.status,
-    body: (await response.json()) as Record<string, any>
+    body: (await response.json()) as Record<string, any>,
   };
 }
 
 async function requestText(
   baseUrl: string,
-  path: string
+  path: string,
 ): Promise<{
   readonly status: number;
   readonly body: string;
@@ -746,7 +773,7 @@ async function requestText(
   return {
     status: response.status,
     body: await response.text(),
-    contentType: response.headers.get("content-type") ?? ""
+    contentType: response.headers.get("content-type") ?? "",
   };
 }
 
@@ -759,7 +786,7 @@ class MockSessionManager implements SessionManagerLike {
     return {
       ...this.session,
       config,
-      workspacePath: config.workspacePath
+      workspacePath: config.workspacePath,
     };
   }
 
@@ -783,7 +810,7 @@ class MockSessionManager implements SessionManagerLike {
       args: [],
       cwd: this.session.workspacePath,
       display: this.session.display,
-      startedAt: new Date("2026-01-01T00:00:00.000Z")
+      startedAt: new Date("2026-01-01T00:00:00.000Z"),
     };
   }
 
@@ -797,7 +824,7 @@ class MockSessionManager implements SessionManagerLike {
       capturedAt: new Date("2026-01-01T00:00:00.000Z"),
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
       display: this.session.display,
-      sequence: 1
+      sequence: 1,
     };
   }
 
@@ -811,7 +838,7 @@ class MockSessionManager implements SessionManagerLike {
 
   async typeText(): Promise<InputActionResult> {
     return this.inputResult("input.type_text", {
-      text: "secret-value"
+      text: "secret-value",
     });
   }
 
@@ -827,8 +854,8 @@ class MockSessionManager implements SessionManagerLike {
     return [
       {
         id: "0x01",
-        title: "Test Window"
-      }
+        title: "Test Window",
+      },
     ];
   }
 
@@ -838,9 +865,9 @@ class MockSessionManager implements SessionManagerLike {
       success: true,
       window: {
         id: "0x01",
-        title: "Test Window"
+        title: "Test Window",
       },
-      createdAt: "2026-01-01T00:00:00.000Z"
+      createdAt: "2026-01-01T00:00:00.000Z",
     };
   }
 
@@ -851,14 +878,14 @@ class MockSessionManager implements SessionManagerLike {
       checks: 2,
       elapsedMs: 1000,
       mode: "hash",
-      discardedScreenshotCount: 0
+      discardedScreenshotCount: 0,
     };
   }
 
   async waitForWindow(): Promise<WindowInfo> {
     return {
       id: "0x01",
-      title: "Test Window"
+      title: "Test Window",
     };
   }
 
@@ -868,7 +895,7 @@ class MockSessionManager implements SessionManagerLike {
       pageId: "page-1",
       url: "http://127.0.0.1:5179",
       title: "Agent Desktop Harness Demo",
-      createdAt: "2026-01-01T00:00:00.000Z"
+      createdAt: "2026-01-01T00:00:00.000Z",
     };
   }
 
@@ -879,7 +906,7 @@ class MockSessionManager implements SessionManagerLike {
   async browserFill(): Promise<BrowserActionResult> {
     return this.browserResult("browser.fill", {
       redacted: true,
-      valueLength: 12
+      valueLength: 12,
     });
   }
 
@@ -902,7 +929,7 @@ class MockSessionManager implements SessionManagerLike {
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
       display: this.session.display,
       sequence: 2,
-      label: "semantic"
+      label: "semantic",
     };
   }
 
@@ -914,7 +941,7 @@ class MockSessionManager implements SessionManagerLike {
     return {
       available: false,
       warnings: [],
-      errors: ["tauri-driver is missing."]
+      errors: ["tauri-driver is missing."],
     };
   }
 
@@ -925,7 +952,7 @@ class MockSessionManager implements SessionManagerLike {
       processId: 456,
       createdAt: "2026-01-01T00:00:00.000Z",
       mode: "x11-fallback",
-      warnings: ["Tauri WebDriver semantic mode is unavailable; use desktop_* X11 fallback tools."]
+      warnings: ["Tauri WebDriver semantic mode is unavailable; use desktop_* X11 fallback tools."],
     };
   }
 
@@ -936,7 +963,7 @@ class MockSessionManager implements SessionManagerLike {
   async tauriFill(): Promise<TauriActionResult> {
     return this.tauriResult("tauri.fill", {
       redacted: true,
-      valueLength: 12
+      valueLength: 12,
     });
   }
 
@@ -955,7 +982,7 @@ class MockSessionManager implements SessionManagerLike {
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
       display: this.session.display,
       sequence: 3,
-      label: "tauri-fallback"
+      label: "tauri-fallback",
     };
   }
 
@@ -969,7 +996,7 @@ class MockSessionManager implements SessionManagerLike {
       playwrightAvailable: true,
       electronBinaryPath: "/tmp/electron",
       warnings: [],
-      errors: []
+      errors: [],
     };
   }
 
@@ -981,7 +1008,7 @@ class MockSessionManager implements SessionManagerLike {
       createdAt: "2026-01-01T00:00:00.000Z",
       mode: "playwright-electron",
       windowTitle: "Agent Desktop Harness Electron Demo",
-      warnings: []
+      warnings: [],
     };
   }
 
@@ -992,7 +1019,7 @@ class MockSessionManager implements SessionManagerLike {
   async electronFill(): Promise<ElectronActionResult> {
     return this.electronResult("electron.fill", {
       redacted: true,
-      valueLength: 12
+      valueLength: 12,
     });
   }
 
@@ -1015,7 +1042,7 @@ class MockSessionManager implements SessionManagerLike {
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
       display: this.session.display,
       sequence: 4,
-      label: "electron-semantic"
+      label: "electron-semantic",
     };
   }
 
@@ -1033,7 +1060,7 @@ class MockSessionManager implements SessionManagerLike {
       noVncWebRootPath: "/usr/share/novnc",
       warnings: [],
       errors: [],
-      installHints: ["sudo apt install -y x11vnc novnc websockify"]
+      installHints: ["sudo apt install -y x11vnc novnc websockify"],
     };
   }
 
@@ -1049,7 +1076,7 @@ class MockSessionManager implements SessionManagerLike {
     return {
       sessionId: this.session.id,
       observerId: "observer-1",
-      stopped: true
+      stopped: true,
     };
   }
 
@@ -1063,34 +1090,34 @@ class MockSessionManager implements SessionManagerLike {
         available: true,
         driver: "browser-playwright",
         warnings: [],
-        errors: []
+        errors: [],
       },
       tauri: {
         available: false,
         driver: "tauri-webdriver",
         experimental: true,
         warnings: [],
-        errors: ["tauri-driver is missing."]
+        errors: ["tauri-driver is missing."],
       },
       electron: {
         available: true,
         driver: "electron-playwright",
         experimental: true,
         warnings: [],
-        errors: []
+        errors: [],
       },
       x11Fallback: {
         available: true,
         driver: "x11-fallback",
         warnings: [],
-        errors: []
-      }
+        errors: [],
+      },
     };
   }
 
   async routeDriver(
     _sessionId: SessionId,
-    request: DriverRouteRequest
+    request: DriverRouteRequest,
   ): Promise<DriverRouteDecision> {
     return {
       appKind: request.appKind,
@@ -1100,7 +1127,7 @@ class MockSessionManager implements SessionManagerLike {
       fallbackUsed: request.appKind !== "browser",
       fallbackReason: request.appKind === "browser" ? undefined : "semantic driver unavailable",
       warnings: [],
-      errors: []
+      errors: [],
     };
   }
 
@@ -1113,7 +1140,7 @@ class MockSessionManager implements SessionManagerLike {
       semantic: true,
       fallbackUsed: false,
       createdAt: "2026-01-01T00:00:00.000Z",
-      warnings: []
+      warnings: [],
     };
   }
 
@@ -1124,7 +1151,7 @@ class MockSessionManager implements SessionManagerLike {
   async appFill(): Promise<AppActionResult> {
     return this.appResult("app.fill", {
       redacted: true,
-      valueLength: 12
+      valueLength: 12,
     });
   }
 
@@ -1147,7 +1174,7 @@ class MockSessionManager implements SessionManagerLike {
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
       display: this.session.display,
       sequence: 5,
-      label: "router"
+      label: "router",
     };
   }
 
@@ -1179,7 +1206,7 @@ class MockSessionManager implements SessionManagerLike {
     return {
       ...this.visualResult("compare-baseline", true),
       baselineName: "sample-vite-clean",
-      baselineSuite: "smoke"
+      baselineSuite: "smoke",
     };
   }
 
@@ -1190,10 +1217,10 @@ class MockSessionManager implements SessionManagerLike {
         x: 1,
         y: 2,
         width: 3,
-        height: 4
+        height: 4,
       },
       screenshotPath: `${this.session.evidencePath}/screenshots/0001-demo.png`,
-      note: "Button overlaps this text."
+      note: "Button overlaps this text.",
     };
   }
 
@@ -1201,7 +1228,7 @@ class MockSessionManager implements SessionManagerLike {
     return {
       ...this.visualResult("assert-annotation-changed", true),
       annotationId: "ann_001",
-      annotationNote: "Button overlaps this text."
+      annotationNote: "Button overlaps this text.",
     };
   }
 
@@ -1209,7 +1236,7 @@ class MockSessionManager implements SessionManagerLike {
     return {
       ...this.visualResult("assert-annotation-similar", true),
       annotationId: "ann_001",
-      annotationNote: "Button overlaps this text."
+      annotationNote: "Button overlaps this text.",
     };
   }
 
@@ -1221,8 +1248,8 @@ class MockSessionManager implements SessionManagerLike {
           x: 1,
           y: 2,
           width: 3,
-          height: 4
-        }
+          height: 4,
+        },
       ],
       insideComparedPixels: 12,
       insideDiffPixels: 4,
@@ -1230,7 +1257,7 @@ class MockSessionManager implements SessionManagerLike {
       outsideComparedPixels: 88,
       outsideDiffPixels: 0,
       outsideDiffPixelRatio: 0,
-      containmentPassed: true
+      containmentPassed: true,
     };
   }
 
@@ -1239,7 +1266,9 @@ class MockSessionManager implements SessionManagerLike {
   }
 
   getVisualDiffFilePath(): string {
-    return this.visualDiffFilePath ?? `${this.session.evidencePath}/visual-diffs/diff_001-router.png`;
+    return (
+      this.visualDiffFilePath ?? `${this.session.evidencePath}/visual-diffs/diff_001-router.png`
+    );
   }
 
   async listScreenshots(): Promise<ScreenshotArtifact[]> {
@@ -1250,8 +1279,8 @@ class MockSessionManager implements SessionManagerLike {
         path: `${this.session.evidencePath}/screenshots/0001-demo.png`,
         sequence: 1,
         label: "demo",
-        createdAt: "2026-01-01T00:00:00.000Z"
-      }
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
     ];
   }
 
@@ -1265,7 +1294,7 @@ class MockSessionManager implements SessionManagerLike {
 
   async createAnnotation(
     sessionId: SessionId,
-    input: CreateAnnotationInput
+    input: CreateAnnotationInput,
   ): Promise<ScreenshotAnnotation> {
     return {
       id: "ann_001",
@@ -1282,7 +1311,7 @@ class MockSessionManager implements SessionManagerLike {
       note: input.note,
       color: input.color,
       cropPath: `${this.session.evidencePath}/annotations/ann_001-crop.png`,
-      createdAt: "2026-01-01T00:00:00.000Z"
+      createdAt: "2026-01-01T00:00:00.000Z",
     };
   }
 
@@ -1299,8 +1328,8 @@ class MockSessionManager implements SessionManagerLike {
         width: 3,
         height: 4,
         note: "Button overlaps this text.",
-        createdAt: "2026-01-01T00:00:00.000Z"
-      }
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
     ];
   }
 
@@ -1309,7 +1338,7 @@ class MockSessionManager implements SessionManagerLike {
       sessionId: this.session.id,
       path: `${this.session.evidencePath}/visual-handoff.md`,
       text: "# Visual Handoff\n\nButton overlaps this text.\n",
-      annotations: await this.listAnnotations()
+      annotations: await this.listAnnotations(),
     };
   }
 
@@ -1319,20 +1348,20 @@ class MockSessionManager implements SessionManagerLike {
 
   private inputResult(
     actionType: string,
-    details: Readonly<Record<string, unknown>> = {}
+    details: Readonly<Record<string, unknown>> = {},
   ): InputActionResult {
     return {
       sessionId: this.session.id,
       actionType,
       createdAt: "2026-01-01T00:00:00.000Z",
       success: true,
-      details
+      details,
     };
   }
 
   private browserResult(
     actionType: string,
-    details: Readonly<Record<string, unknown>> = {}
+    details: Readonly<Record<string, unknown>> = {},
   ): BrowserActionResult {
     return {
       sessionId: this.session.id,
@@ -1340,13 +1369,13 @@ class MockSessionManager implements SessionManagerLike {
       actionType,
       createdAt: "2026-01-01T00:00:00.000Z",
       success: true,
-      details
+      details,
     };
   }
 
   private tauriResult(
     actionType: string,
-    details: Readonly<Record<string, unknown>> = {}
+    details: Readonly<Record<string, unknown>> = {},
   ): TauriActionResult {
     return {
       sessionId: this.session.id,
@@ -1357,15 +1386,15 @@ class MockSessionManager implements SessionManagerLike {
       mode: "x11-fallback",
       details: {
         unavailable: true,
-        ...details
+        ...details,
       },
-      warnings: ["Tauri WebDriver semantic mode is unavailable; use desktop_* X11 fallback tools."]
+      warnings: ["Tauri WebDriver semantic mode is unavailable; use desktop_* X11 fallback tools."],
     };
   }
 
   private electronResult(
     actionType: string,
-    details: Readonly<Record<string, unknown>> = {}
+    details: Readonly<Record<string, unknown>> = {},
   ): ElectronActionResult {
     return {
       sessionId: this.session.id,
@@ -1374,13 +1403,13 @@ class MockSessionManager implements SessionManagerLike {
       createdAt: "2026-01-01T00:00:00.000Z",
       success: true,
       mode: "playwright-electron",
-      details
+      details,
     };
   }
 
   private appResult(
     actionType: string,
-    details: Readonly<Record<string, unknown>> = {}
+    details: Readonly<Record<string, unknown>> = {},
   ): AppActionResult {
     return {
       sessionId: this.session.id,
@@ -1393,7 +1422,7 @@ class MockSessionManager implements SessionManagerLike {
       createdAt: "2026-01-01T00:00:00.000Z",
       success: true,
       warnings: [],
-      details
+      details,
     };
   }
 
@@ -1406,7 +1435,7 @@ class MockSessionManager implements SessionManagerLike {
       | "assert-annotation-changed"
       | "assert-annotation-similar"
       | "assert-change-contained",
-    passed: boolean | undefined
+    passed: boolean | undefined,
   ): VisualCompareResult {
     return {
       sessionId: this.session.id,
@@ -1425,7 +1454,7 @@ class MockSessionManager implements SessionManagerLike {
       maxDiffPixelRatio: kind === "assert-similar" ? 0.1 : undefined,
       passed,
       createdAt: "2026-01-01T00:00:00.000Z",
-      warnings: []
+      warnings: [],
     };
   }
 
@@ -1437,7 +1466,7 @@ class MockSessionManager implements SessionManagerLike {
       sourceScreenshotPath: `${this.session.evidencePath}/screenshots/0001-before.png`,
       width: 10,
       height: 10,
-      createdAt: "2026-01-01T00:00:00.000Z"
+      createdAt: "2026-01-01T00:00:00.000Z",
     };
   }
 
@@ -1451,7 +1480,7 @@ class MockSessionManager implements SessionManagerLike {
       viewOnly: true,
       url: "http://127.0.0.1:6081/vnc.html?autoconnect=1&resize=scale&view_only=1",
       createdAt: "2026-01-01T00:00:00.000Z",
-      warnings: []
+      warnings: [],
     };
   }
 }
@@ -1460,7 +1489,7 @@ function makeSession(): DesktopSession {
   return {
     id: "session-1",
     config: {
-      workspacePath: "/tmp/agent-desktop-harness-http-test"
+      workspacePath: "/tmp/agent-desktop-harness-http-test",
     },
     driverKind: "unknown",
     status: "running",
@@ -1473,8 +1502,8 @@ function makeSession(): DesktopSession {
     height: 900,
     depth: 24,
     processIds: {
-      apps: []
+      apps: [],
     },
-    warnings: []
+    warnings: [],
   };
 }

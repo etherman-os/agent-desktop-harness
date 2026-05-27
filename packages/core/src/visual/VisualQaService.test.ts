@@ -1,8 +1,8 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
 import { PNG } from "pngjs";
 import { VisualQaService } from "./VisualQaService.js";
 
@@ -20,7 +20,7 @@ test("VisualQaService assert-changed passes and fails from diff ratio", async ()
       kind: "assert-changed",
       beforePath,
       afterPath,
-      minDiffPixelRatio: 0.2
+      minDiffPixelRatio: 0.2,
     });
     assert.equal(pass.passed, true);
 
@@ -28,7 +28,7 @@ test("VisualQaService assert-changed passes and fails from diff ratio", async ()
       kind: "assert-changed",
       beforePath,
       afterPath,
-      minDiffPixelRatio: 0.5
+      minDiffPixelRatio: 0.5,
     });
     assert.equal(fail.passed, false);
   } finally {
@@ -50,7 +50,7 @@ test("VisualQaService assert-similar passes and fails from diff ratio", async ()
       kind: "assert-similar",
       beforePath,
       afterPath,
-      maxDiffPixelRatio: 0.3
+      maxDiffPixelRatio: 0.3,
     });
     assert.equal(pass.passed, true);
 
@@ -58,7 +58,7 @@ test("VisualQaService assert-similar passes and fails from diff ratio", async ()
       kind: "assert-similar",
       beforePath,
       afterPath,
-      maxDiffPixelRatio: 0.1
+      maxDiffPixelRatio: 0.1,
     });
     assert.equal(fail.passed, false);
   } finally {

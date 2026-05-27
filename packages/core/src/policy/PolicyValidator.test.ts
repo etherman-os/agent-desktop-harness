@@ -1,6 +1,6 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
+import test from "node:test";
 import { PolicyError } from "../errors.js";
 import type { DesktopSession } from "../types.js";
 import { PolicyValidator } from "./PolicyValidator.js";
@@ -12,7 +12,7 @@ function makeSession(policy: DesktopSession["config"]["policy"]): DesktopSession
     id: "session-test",
     config: {
       workspacePath,
-      policy
+      policy,
     },
     driverKind: "unknown",
     status: "running",
@@ -25,9 +25,9 @@ function makeSession(policy: DesktopSession["config"]["policy"]): DesktopSession
     height: 900,
     depth: 24,
     processIds: {
-      apps: []
+      apps: [],
     },
-    warnings: []
+    warnings: [],
   };
 }
 
@@ -39,7 +39,7 @@ test("PolicyValidator allows allowlisted launch commands", () => {
     validator.validateLaunchConfig(session, {
       command: "pnpm",
       args: ["dev"],
-      cwd: workspacePath
+      cwd: workspacePath,
     });
   });
 });
@@ -52,7 +52,7 @@ test("PolicyValidator rejects unlisted commands without local development opt-in
     validator.validateLaunchConfig(session, {
       command: "pnpm",
       args: ["dev"],
-      cwd: workspacePath
+      cwd: workspacePath,
     });
   }, PolicyError);
 });
@@ -60,14 +60,14 @@ test("PolicyValidator rejects unlisted commands without local development opt-in
 test("PolicyValidator rejects shell command strings", () => {
   const validator = new PolicyValidator();
   const session = makeSession({
-    allowUnlistedCommandsForLocalDevelopment: true
+    allowUnlistedCommandsForLocalDevelopment: true,
   });
 
   assert.throws(() => {
     validator.validateLaunchConfig(session, {
       command: "pnpm dev",
       args: [],
-      cwd: workspacePath
+      cwd: workspacePath,
     });
   }, /Shell command strings are not accepted/);
 });
@@ -80,7 +80,7 @@ test("PolicyValidator rejects cwd outside the session workspace", () => {
     validator.validateLaunchConfig(session, {
       command: "pnpm",
       args: ["dev"],
-      cwd: resolve("/tmp")
+      cwd: resolve("/tmp"),
     });
   }, /cwd must stay inside/);
 });

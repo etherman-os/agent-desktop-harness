@@ -2,11 +2,11 @@ import { ProcessError } from "../errors.js";
 import type {
   ImageRegion,
   RectangleOverlapResult,
-  VisualCheckRegionOverlapOptions
+  VisualCheckRegionOverlapOptions,
 } from "./visualTypes.js";
 
 export function checkRegionOverlaps(
-  options: VisualCheckRegionOverlapOptions
+  options: VisualCheckRegionOverlapOptions,
 ): RectangleOverlapResult[] {
   if (options.labels && options.labels.length !== options.regions.length) {
     throw new ProcessError("Region overlap labels must match the number of regions.");
@@ -30,7 +30,7 @@ export function checkRegionOverlaps(
         overlapRegion,
         overlapArea,
         overlapRatioA: areaA > 0 ? overlapArea / areaA : 0,
-        overlapRatioB: areaB > 0 ? overlapArea / areaB : 0
+        overlapRatioB: areaB > 0 ? overlapArea / areaB : 0,
       });
     }
   }
@@ -51,7 +51,7 @@ function getOverlapRegion(a: ImageRegion, b: ImageRegion): ImageRegion | undefin
     x,
     y,
     width,
-    height
+    height,
   };
 }
 
@@ -60,17 +60,13 @@ function normalizeOverlapRegion(region: ImageRegion | undefined): ImageRegion {
     throw new ProcessError("Region overlap checks require valid regions.");
   }
   const values = [region.x, region.y, region.width, region.height];
-  if (
-    values.some((value) => !Number.isFinite(value)) ||
-    region.width <= 0 ||
-    region.height <= 0
-  ) {
+  if (values.some((value) => !Number.isFinite(value)) || region.width <= 0 || region.height <= 0) {
     throw new ProcessError("Region overlap checks require positive finite rectangles.");
   }
   return {
     x: Math.floor(region.x),
     y: Math.floor(region.y),
     width: Math.floor(region.width),
-    height: Math.floor(region.height)
+    height: Math.floor(region.height),
   };
 }

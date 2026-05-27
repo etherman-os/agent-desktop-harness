@@ -1,9 +1,6 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  browserLaunchArgs,
-  inferBrowserName
-} from "./PlaywrightBrowserDriver.js";
+import test from "node:test";
+import { browserLaunchArgs, inferBrowserName } from "./PlaywrightBrowserDriver.js";
 
 test("inferBrowserName maps common browser executable names", () => {
   assert.equal(inferBrowserName("/usr/bin/google-chrome"), "chrome");

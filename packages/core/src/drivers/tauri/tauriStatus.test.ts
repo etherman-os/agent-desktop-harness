@@ -5,7 +5,7 @@ import { getTauriDriverStatus } from "./tauriStatus.js";
 test("getTauriDriverStatus reports missing Linux WebDriver prerequisites", async () => {
   const status = await getTauriDriverStatus({
     platform: "linux",
-    findExecutable: async () => undefined
+    findExecutable: async () => undefined,
   });
 
   assert.equal(status.available, false);
@@ -18,7 +18,7 @@ test("getTauriDriverStatus reports missing Linux WebDriver prerequisites", async
 test("getTauriDriverStatus reports available Linux prerequisites", async () => {
   const status = await getTauriDriverStatus({
     platform: "linux",
-    findExecutable: async (command) => `/usr/bin/${command}`
+    findExecutable: async (command) => `/usr/bin/${command}`,
   });
 
   assert.equal(status.available, true);
@@ -31,7 +31,7 @@ test("getTauriDriverStatus reports available Linux prerequisites", async () => {
 test("getTauriDriverStatus does not overclaim macOS support", async () => {
   const status = await getTauriDriverStatus({
     platform: "darwin",
-    findExecutable: async (command) => `/usr/bin/${command}`
+    findExecutable: async (command) => `/usr/bin/${command}`,
   });
 
   assert.equal(status.available, false);

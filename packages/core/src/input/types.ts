@@ -4,7 +4,7 @@ import type {
   HotkeyAction,
   InputActionResult,
   ScrollAction,
-  TypeTextAction
+  TypeTextAction,
 } from "../types.js";
 
 export interface InputBackend {

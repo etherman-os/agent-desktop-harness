@@ -1,29 +1,23 @@
-import { readFile, mkdtemp, rm } from "node:fs/promises";
+import type { ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawn } from "node:child_process";
-import type { ChildProcess } from "node:child_process";
 import {
   buildBrowserLaunchConfig,
   detectGuiBrowser,
   formatMissingGuiBrowserMessage,
-  type GuiBrowser
+  type GuiBrowser,
 } from "./browser.js";
 import type { DoctorReport } from "./doctor.js";
-import { formatMissingRequiredMessage, getMissingRequiredDependencies, runDoctor } from "./doctor.js";
 import {
-  httpJsonRequest,
-  type FetchLike
-} from "./httpSmoke.js";
-import {
-  RawMcpClient,
-  waitForMcpWindows
-} from "./mcpSmoke.js";
-import {
-  collectChildOutput,
-  runProcess,
-  stopChildProcess
-} from "./processUtils.js";
+  formatMissingRequiredMessage,
+  getMissingRequiredDependencies,
+  runDoctor,
+} from "./doctor.js";
+import { type FetchLike, httpJsonRequest } from "./httpSmoke.js";
+import { RawMcpClient } from "./mcpSmoke.js";
+import { collectChildOutput, runProcess, stopChildProcess } from "./processUtils.js";
 import { repoRootPath } from "./repo.js";
 import { defaultWorkspacePath } from "./workspace.js";
 
@@ -33,7 +27,7 @@ const VITE_URL_HOST = "127.0.0.1";
 const VITE_COORDINATES = {
   input: { x: 720, y: 550 },
   saveButton: { x: 510, y: 635 },
-  detailsButton: { x: 735, y: 635 }
+  detailsButton: { x: 735, y: 635 },
 };
 
 export interface SmokeViteHttpArgs {
@@ -78,12 +72,11 @@ export interface SmokeViteOptions {
 
 export async function runSmokeViteHttp(
   args: readonly string[],
-  options: SmokeViteOptions = {}
+  options: SmokeViteOptions = {},
 ): Promise<SmokeViteResult> {
   const parsed = parseSmokeViteHttpArgs(args);
   const report =
-    options.doctorReport ??
-    (await (options.runDoctor ?? (async () => await runDoctor()))());
+    options.doctorReport ?? (await (options.runDoctor ?? (async () => await runDoctor()))());
   ensureViteSmokeReady(report);
   const browser = await requireGuiBrowser();
   const rootPath = repoRootPath();
@@ -99,10 +92,9 @@ export async function runSmokeViteHttp(
   let stopped = false;
   let serverStopped = false;
   let viteStopped = false;
-  let result: Omit<
-    SmokeViteResult,
-    "cleanupSucceeded" | "stopped" | "serverStopped" | "viteStopped"
-  > | undefined;
+  let result:
+    | Omit<SmokeViteResult, "cleanupSucceeded" | "stopped" | "serverStopped" | "viteStopped">
+    | undefined;
   let runError: unknown;
   let cleanupError: unknown;
 
@@ -112,7 +104,7 @@ export async function runSmokeViteHttp(
 
     await runProcess("pnpm", ["--filter", "@agent-desktop-harness/http-server", "build"], {
       cwd: rootPath,
-      env: process.env
+      env: process.env,
     });
     httpServer = startHttpServer(rootPath, parsed.httpPort);
     const httpOutput = collectChildOutput(httpServer);
@@ -130,10 +122,10 @@ export async function runSmokeViteHttp(
           height: 900,
           depth: 24,
           policy: {
-            allowedCommands: [browserLaunch.command]
-          }
-        }
-      }
+            allowedCommands: [browserLaunch.command],
+          },
+        },
+      },
     );
     sessionId = createResponse.session.id;
 
@@ -143,8 +135,8 @@ export async function runSmokeViteHttp(
         command: browserLaunch.command,
         args: browserLaunch.args,
         cwd: appPath,
-        label: "vite-http-browser"
-      }
+        label: "vite-http-browser",
+      },
     });
 
     const windowResponse = await httpJsonRequest<WaitForWindowResponse>(
@@ -155,15 +147,15 @@ export async function runSmokeViteHttp(
         body: {
           excludeDevtools: true,
           preferLargest: true,
-          timeoutMs: 8000
-        }
-      }
+          timeoutMs: 8000,
+        },
+      },
     );
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/focus-window`, {
       method: "POST",
       body: {
-        id: windowResponse.window.id
-      }
+        id: windowResponse.window.id,
+      },
     });
     await delay(1000);
 
@@ -173,25 +165,25 @@ export async function runSmokeViteHttp(
       {
         method: "POST",
         body: {
-          label: "vite-http-initial"
-        }
-      }
+          label: "vite-http-initial",
+        },
+      },
     );
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/click`, {
       method: "POST",
       body: {
         ...VITE_COORDINATES.input,
         button: "left",
-        label: "vite-http-click-input"
-      }
+        label: "vite-http-click-input",
+      },
     });
     await delay(100);
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/type-text`, {
       method: "POST",
       body: {
         text: parsed.text,
-        label: "vite-http-type-message"
-      }
+        label: "vite-http-type-message",
+      },
     });
     await delay(100);
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/click`, {
@@ -199,8 +191,8 @@ export async function runSmokeViteHttp(
       body: {
         ...VITE_COORDINATES.saveButton,
         button: "left",
-        label: "vite-http-click-save"
-      }
+        label: "vite-http-click-save",
+      },
     });
     await delay(250);
     const afterSaveScreenshot = await httpJsonRequest<ScreenshotResponse>(
@@ -209,17 +201,17 @@ export async function runSmokeViteHttp(
       {
         method: "POST",
         body: {
-          label: "vite-http-after-save"
-        }
-      }
+          label: "vite-http-after-save",
+        },
+      },
     );
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/click`, {
       method: "POST",
       body: {
         ...VITE_COORDINATES.detailsButton,
         button: "left",
-        label: "vite-http-click-details"
-      }
+        label: "vite-http-click-details",
+      },
     });
     await delay(250);
     const detailsScreenshot = await httpJsonRequest<ScreenshotResponse>(
@@ -228,14 +220,14 @@ export async function runSmokeViteHttp(
       {
         method: "POST",
         body: {
-          label: "vite-http-details-open"
-        }
-      }
+          label: "vite-http-details-open",
+        },
+      },
     );
     await assertViteScreenshotsChanged(
       initialScreenshot.screenshot.path,
       afterSaveScreenshot.screenshot.path,
-      detailsScreenshot.screenshot.path
+      detailsScreenshot.screenshot.path,
     );
     const stableResponse = await httpJsonRequest<WaitForStableScreenResponse>(
       fetchLike,
@@ -249,19 +241,19 @@ export async function runSmokeViteHttp(
           label: "vite-http-stable",
           mode: "tolerant",
           fileSizeToleranceBytes: 4096,
-          retainOnlyLast: true
-        }
-      }
+          retainOnlyLast: true,
+        },
+      },
     );
 
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}`, {
-      method: "DELETE"
+      method: "DELETE",
     });
     stopped = true;
 
     const reportResponse = await httpJsonRequest<EvidenceReportResponse>(
       fetchLike,
-      `${httpBaseUrl}/sessions/${sessionId}/evidence/report`
+      `${httpBaseUrl}/sessions/${sessionId}/evidence/report`,
     );
 
     result = {
@@ -274,10 +266,10 @@ export async function runSmokeViteHttp(
       screenshots: [
         initialScreenshot.screenshot.path,
         afterSaveScreenshot.screenshot.path,
-        detailsScreenshot.screenshot.path
+        detailsScreenshot.screenshot.path,
       ],
       stableScreen: formatHttpStableResult(stableResponse),
-      reportPath: reportResponse.path
+      reportPath: reportResponse.path,
     };
   } catch (error) {
     runError = error;
@@ -286,7 +278,7 @@ export async function runSmokeViteHttp(
       try {
         const httpBaseUrl = `http://127.0.0.1:${parsed.httpPort}`;
         await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}`, {
-          method: "DELETE"
+          method: "DELETE",
         });
         stopped = true;
       } catch (error) {
@@ -330,18 +322,17 @@ export async function runSmokeViteHttp(
     cleanupSucceeded: stopped && serverStopped && viteStopped,
     stopped,
     serverStopped,
-    viteStopped
+    viteStopped,
   };
 }
 
 export async function runSmokeViteMcp(
   args: readonly string[],
-  options: SmokeViteOptions = {}
+  options: SmokeViteOptions = {},
 ): Promise<SmokeViteResult> {
   const parsed = parseSmokeViteMcpArgs(args);
   const report =
-    options.doctorReport ??
-    (await (options.runDoctor ?? (async () => await runDoctor()))());
+    options.doctorReport ?? (await (options.runDoctor ?? (async () => await runDoctor()))());
   ensureViteSmokeReady(report);
   const browser = await requireGuiBrowser();
   const rootPath = repoRootPath();
@@ -358,10 +349,9 @@ export async function runSmokeViteMcp(
   let stopped = false;
   let serverStopped = false;
   let viteStopped = false;
-  let result: Omit<
-    SmokeViteResult,
-    "cleanupSucceeded" | "stopped" | "serverStopped" | "viteStopped"
-  > | undefined;
+  let result:
+    | Omit<SmokeViteResult, "cleanupSucceeded" | "stopped" | "serverStopped" | "viteStopped">
+    | undefined;
   let runError: unknown;
   let cleanupError: unknown;
 
@@ -371,13 +361,13 @@ export async function runSmokeViteMcp(
 
     await runProcess("pnpm", ["--filter", "@agent-desktop-harness/mcp-server", "build"], {
       cwd: rootPath,
-      env: process.env
+      env: process.env,
     });
     mcpServer = spawn(process.execPath, [join(rootPath, "packages/mcp-server/dist/index.js")], {
       cwd: rootPath,
       env: process.env,
       shell: false,
-      stdio: ["pipe", "pipe", "pipe"]
+      stdio: ["pipe", "pipe", "pipe"],
     });
     client = new RawMcpClient(mcpServer);
     await client.initialize();
@@ -391,7 +381,7 @@ export async function runSmokeViteMcp(
       "desktop_focus_window",
       "desktop_click",
       "desktop_type_text",
-      "desktop_stop_session"
+      "desktop_stop_session",
     ]);
 
     const session = await client.callTool<SessionToolResult>("desktop_start_session", {
@@ -400,8 +390,8 @@ export async function runSmokeViteMcp(
       height: 900,
       depth: 24,
       policy: {
-        allowedCommands: [browserLaunch.command]
-      }
+        allowedCommands: [browserLaunch.command],
+      },
     });
     sessionId = session.id;
 
@@ -410,73 +400,64 @@ export async function runSmokeViteMcp(
       command: browserLaunch.command,
       args: browserLaunch.args,
       cwd: appPath,
-      label: "vite-mcp-browser"
+      label: "vite-mcp-browser",
     });
 
     const targetWindow = await client.callTool<HttpWindowInfo>("desktop_wait_for_window", {
       sessionId,
       excludeDevtools: true,
       preferLargest: true,
-      timeoutMs: 8000
+      timeoutMs: 8000,
     });
     await client.callTool("desktop_focus_window", {
       sessionId,
-      id: targetWindow.id
+      id: targetWindow.id,
     });
     await delay(1000);
 
-    const initialScreenshot = await client.callTool<ScreenshotToolResult>(
-      "desktop_screenshot",
-      {
-        sessionId,
-        label: "vite-mcp-initial"
-      }
-    );
+    const initialScreenshot = await client.callTool<ScreenshotToolResult>("desktop_screenshot", {
+      sessionId,
+      label: "vite-mcp-initial",
+    });
     await client.callTool("desktop_click", {
       sessionId,
       ...VITE_COORDINATES.input,
       button: "left",
-      label: "vite-mcp-click-input"
+      label: "vite-mcp-click-input",
     });
     await delay(100);
     await client.callTool("desktop_type_text", {
       sessionId,
       text: parsed.text,
-      label: "vite-mcp-type-message"
+      label: "vite-mcp-type-message",
     });
     await delay(100);
     await client.callTool("desktop_click", {
       sessionId,
       ...VITE_COORDINATES.saveButton,
       button: "left",
-      label: "vite-mcp-click-save"
+      label: "vite-mcp-click-save",
     });
     await delay(250);
-    const afterSaveScreenshot = await client.callTool<ScreenshotToolResult>(
-      "desktop_screenshot",
-      {
-        sessionId,
-        label: "vite-mcp-after-save"
-      }
-    );
+    const afterSaveScreenshot = await client.callTool<ScreenshotToolResult>("desktop_screenshot", {
+      sessionId,
+      label: "vite-mcp-after-save",
+    });
     await client.callTool("desktop_click", {
       sessionId,
       ...VITE_COORDINATES.detailsButton,
       button: "left",
-      label: "vite-mcp-click-details"
+      label: "vite-mcp-click-details",
     });
     await delay(250);
-    const detailsScreenshot = await client.callTool<ScreenshotToolResult>(
-      "desktop_screenshot",
-      {
-        sessionId,
-        label: "vite-mcp-details-open"
-      }
-    );
+    const detailsScreenshot = await client.callTool<ScreenshotToolResult>("desktop_screenshot", {
+      sessionId,
+      label: "vite-mcp-details-open",
+    });
     await assertViteScreenshotsChanged(
       initialScreenshot.path,
       afterSaveScreenshot.path,
-      detailsScreenshot.path
+      detailsScreenshot.path,
     );
     const stableScreen = await client.callTool<StableScreenToolResult>(
       "desktop_wait_for_stable_screen",
@@ -488,17 +469,16 @@ export async function runSmokeViteMcp(
         label: "vite-mcp-stable",
         mode: "tolerant",
         fileSizeToleranceBytes: 4096,
-        retainOnlyLast: true
-      }
+        retainOnlyLast: true,
+      },
     );
 
     await client.callTool("desktop_stop_session", { sessionId });
     stopped = true;
 
-    const report = await client.callTool<EvidenceReportToolResult>(
-      "desktop_get_evidence_report",
-      { sessionId }
-    );
+    const report = await client.callTool<EvidenceReportToolResult>("desktop_get_evidence_report", {
+      sessionId,
+    });
 
     result = {
       sessionId,
@@ -506,18 +486,14 @@ export async function runSmokeViteMcp(
       browserPath: browser.path,
       vitePort: parsed.vitePort,
       evidencePath: session.evidencePath,
-      screenshots: [
-        initialScreenshot.path,
-        afterSaveScreenshot.path,
-        detailsScreenshot.path
-      ],
+      screenshots: [initialScreenshot.path, afterSaveScreenshot.path, detailsScreenshot.path],
       stableScreen: {
         stable: stableScreen.stable,
         checks: stableScreen.checks,
         elapsedMs: stableScreen.elapsedMs,
-        lastScreenshotPath: stableScreen.lastScreenshot?.path
+        lastScreenshotPath: stableScreen.lastScreenshot?.path,
       },
-      reportPath: report.path
+      reportPath: report.path,
     };
   } catch (error) {
     runError = error;
@@ -574,7 +550,7 @@ export async function runSmokeViteMcp(
     cleanupSucceeded: stopped && serverStopped && viteStopped,
     stopped,
     serverStopped,
-    viteStopped
+    viteStopped,
   };
 }
 
@@ -618,7 +594,7 @@ export function parseSmokeViteHttpArgs(args: readonly string[]): SmokeViteHttpAr
     workspacePath,
     vitePort,
     httpPort,
-    text
+    text,
   };
 }
 
@@ -654,7 +630,7 @@ export function parseSmokeViteMcpArgs(args: readonly string[]): SmokeViteMcpArgs
   return {
     workspacePath,
     vitePort,
-    text
+    text,
   };
 }
 
@@ -678,20 +654,13 @@ function startViteServer(rootPath: string, port: number): ChildProcess {
 
   return spawn(
     process.execPath,
-    [
-      viteBin,
-      "--host",
-      VITE_URL_HOST,
-      "--port",
-      String(port),
-      "--strictPort"
-    ],
+    [viteBin, "--host", VITE_URL_HOST, "--port", String(port), "--strictPort"],
     {
       cwd: appPath,
       env: process.env,
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"]
-    }
+      stdio: ["ignore", "pipe", "pipe"],
+    },
   );
 }
 
@@ -701,10 +670,10 @@ function startHttpServer(rootPath: string, port: number): ChildProcess {
     env: {
       ...process.env,
       AGENT_DESKTOP_HARNESS_HOST: "127.0.0.1",
-      AGENT_DESKTOP_HARNESS_PORT: String(port)
+      AGENT_DESKTOP_HARNESS_PORT: String(port),
     },
     shell: false,
-    stdio: ["ignore", "pipe", "pipe"]
+    stdio: ["ignore", "pipe", "pipe"],
   });
 }
 
@@ -714,7 +683,7 @@ async function waitForHttpOk(
   server: { readonly exitCode: number | null; readonly signalCode: NodeJS.Signals | null },
   serverOutput: { readonly stdout: string; readonly stderr: string },
   label: string,
-  timeoutMs = 10_000
+  timeoutMs = 10_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
@@ -740,7 +709,7 @@ async function waitForHttpOk(
   throw new Error(
     `${label} server did not become ready within ${timeoutMs}ms: ${
       lastError instanceof Error ? lastError.message : String(lastError)
-    }`
+    }`,
   );
 }
 
@@ -749,7 +718,7 @@ async function waitForHttpJsonHealth(
   fetchLike: FetchLike,
   server: { readonly exitCode: number | null; readonly signalCode: NodeJS.Signals | null },
   serverOutput: { readonly stdout: string; readonly stderr: string },
-  timeoutMs = 10_000
+  timeoutMs = 10_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
@@ -762,7 +731,7 @@ async function waitForHttpJsonHealth(
     try {
       const result = await httpJsonRequest<{ readonly ok?: boolean }>(
         fetchLike,
-        `${baseUrl}/health`
+        `${baseUrl}/health`,
       );
       if (result.ok === true) {
         return;
@@ -777,22 +746,22 @@ async function waitForHttpJsonHealth(
   throw new Error(
     `HTTP smoke server did not become ready within ${timeoutMs}ms: ${
       lastError instanceof Error ? lastError.message : String(lastError)
-    }`
+    }`,
   );
 }
 
-async function waitForHttpWindows(
+async function _waitForHttpWindows(
   fetchLike: FetchLike,
   baseUrl: string,
   sessionId: string,
-  timeoutMs = 8000
+  timeoutMs = 8000,
 ): Promise<HttpWindowInfo[]> {
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
     const response = await httpJsonRequest<WindowsResponse>(
       fetchLike,
-      `${baseUrl}/sessions/${sessionId}/windows`
+      `${baseUrl}/sessions/${sessionId}/windows`,
     );
     if (response.windows.length > 0) {
       return response.windows;
@@ -806,29 +775,29 @@ async function waitForHttpWindows(
 async function assertViteScreenshotsChanged(
   initialPath: string,
   afterSavePath: string,
-  detailsPath: string
+  detailsPath: string,
 ): Promise<void> {
   const [initial, afterSave, details] = await Promise.all([
     readFile(initialPath),
     readFile(afterSavePath),
-    readFile(detailsPath)
+    readFile(detailsPath),
   ]);
 
   if (initial.equals(afterSave)) {
     throw new Error(
-      "Vite smoke screenshots did not change after saving the message. Check browser focus and click coordinates."
+      "Vite smoke screenshots did not change after saving the message. Check browser focus and click coordinates.",
     );
   }
 
   if (afterSave.equals(details)) {
     throw new Error(
-      "Vite smoke screenshots did not change after opening the details panel. Check browser focus and click coordinates."
+      "Vite smoke screenshots did not change after opening the details panel. Check browser focus and click coordinates.",
     );
   }
 }
 
-function selectBrowserWindow<T extends { readonly id: string; readonly title: string }>(
-  windows: readonly T[]
+function _selectBrowserWindow<T extends { readonly id: string; readonly title: string }>(
+  windows: readonly T[],
 ): T {
   const browserWindow =
     windows.find((window) => /agent desktop harness demo/i.test(window.title)) ??
@@ -843,34 +812,30 @@ function selectBrowserWindow<T extends { readonly id: string; readonly title: st
 }
 
 function formatHttpStableResult(
-  response: WaitForStableScreenResponse
+  response: WaitForStableScreenResponse,
 ): SmokeViteResult["stableScreen"] {
   return {
     stable: response.result.stable,
     checks: response.result.checks,
     elapsedMs: response.result.elapsedMs,
-    lastScreenshotPath: response.result.lastScreenshot?.path
+    lastScreenshotPath: response.result.lastScreenshot?.path,
   };
 }
 
 function formatServerExitedMessage(
   label: string,
-  output: { readonly stdout: string; readonly stderr: string }
+  output: { readonly stdout: string; readonly stderr: string },
 ): string {
   return [
     `${label} server exited before it became ready.`,
     output.stderr.trim() ? `stderr:\n${output.stderr.trim()}` : undefined,
-    output.stdout.trim() ? `stdout:\n${output.stdout.trim()}` : undefined
+    output.stdout.trim() ? `stdout:\n${output.stdout.trim()}` : undefined,
   ]
     .filter(Boolean)
     .join("\n");
 }
 
-function requireValue(
-  args: readonly string[],
-  index: number,
-  optionName: string
-): string {
+function requireValue(args: readonly string[], index: number, optionName: string): string {
   const value = args[index + 1];
   if (!value) {
     throw new Error(`${optionName} requires a value.`);

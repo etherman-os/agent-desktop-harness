@@ -49,7 +49,7 @@ export class DisplayAllocator {
       this.activeDisplays.add(displayNumber);
       return {
         number: displayNumber,
-        value: `:${displayNumber}`
+        value: `:${displayNumber}`,
       };
     }
 

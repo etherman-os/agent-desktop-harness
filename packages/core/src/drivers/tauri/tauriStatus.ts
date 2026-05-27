@@ -8,7 +8,7 @@ export interface TauriStatusOptions {
 }
 
 export async function getTauriDriverStatus(
-  options: TauriStatusOptions = {}
+  options: TauriStatusOptions = {},
 ): Promise<TauriDriverStatus> {
   const env = options.env ?? process.env;
   const platform = options.platform ?? process.platform;
@@ -16,7 +16,7 @@ export async function getTauriDriverStatus(
   const [tauriDriverPath, webKitWebDriverPath, cargoPath] = await Promise.all([
     findExecutable("tauri-driver", env),
     findExecutable("WebKitWebDriver", env),
-    findExecutable("cargo", env)
+    findExecutable("cargo", env),
   ]);
   const warnings: string[] = [];
   const errors: string[] = [];
@@ -31,12 +31,12 @@ export async function getTauriDriverStatus(
   if (platform === "linux") {
     if (!webKitWebDriverPath) {
       errors.push(
-        "WebKitWebDriver is missing. Install the WebKit WebDriver package for this distribution."
+        "WebKitWebDriver is missing. Install the WebKit WebDriver package for this distribution.",
       );
     }
   } else if (platform === "darwin") {
     errors.push(
-      "Tauri desktop WebDriver is not supported on macOS because WKWebView does not provide a WebDriver tool."
+      "Tauri desktop WebDriver is not supported on macOS because WKWebView does not provide a WebDriver tool.",
     );
   } else if (platform === "win32") {
     warnings.push("Windows requires a matching Microsoft Edge WebDriver on PATH for tauri-driver.");
@@ -50,6 +50,6 @@ export async function getTauriDriverStatus(
     webKitWebDriverPath,
     cargoPath,
     warnings,
-    errors
+    errors,
   };
 }

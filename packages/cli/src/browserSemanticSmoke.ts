@@ -1,19 +1,16 @@
-import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
 import { join } from "node:path";
-import {
-  detectGuiBrowser,
-  formatMissingGuiBrowserMessage
-} from "./browser.js";
 import type { GuiBrowser } from "./browser.js";
+import { detectGuiBrowser, formatMissingGuiBrowserMessage } from "./browser.js";
 import type { DoctorReport } from "./doctor.js";
-import { formatMissingRequiredMessage, getMissingRequiredDependencies, runDoctor } from "./doctor.js";
-import { httpJsonRequest, type FetchLike } from "./httpSmoke.js";
 import {
-  collectChildOutput,
-  runProcess,
-  stopChildProcess
-} from "./processUtils.js";
+  formatMissingRequiredMessage,
+  getMissingRequiredDependencies,
+  runDoctor,
+} from "./doctor.js";
+import { type FetchLike, httpJsonRequest } from "./httpSmoke.js";
+import { collectChildOutput, runProcess, stopChildProcess } from "./processUtils.js";
 import { repoRootPath } from "./repo.js";
 import { defaultWorkspacePath } from "./workspace.js";
 
@@ -51,16 +48,14 @@ export interface SmokeBrowserSemanticOptions {
 
 export async function runSmokeBrowserSemantic(
   args: readonly string[],
-  options: SmokeBrowserSemanticOptions = {}
+  options: SmokeBrowserSemanticOptions = {},
 ): Promise<SmokeBrowserSemanticResult> {
   const parsed = parseSmokeBrowserSemanticArgs(args);
   const report =
-    options.doctorReport ??
-    (await (options.runDoctor ?? (async () => await runDoctor()))());
+    options.doctorReport ?? (await (options.runDoctor ?? (async () => await runDoctor()))());
   ensureBrowserSemanticSmokeReady(report);
   const browser =
-    (await (options.detectBrowser ?? (async () => await detectGuiBrowser()))()) ??
-    undefined;
+    (await (options.detectBrowser ?? (async () => await detectGuiBrowser()))()) ?? undefined;
   if (!browser) {
     throw new Error(formatMissingGuiBrowserMessage());
   }
@@ -75,10 +70,12 @@ export async function runSmokeBrowserSemantic(
   let stopped = false;
   let serverStopped = false;
   let viteStopped = false;
-  let result: Omit<
-    SmokeBrowserSemanticResult,
-    "cleanupSucceeded" | "stopped" | "serverStopped" | "viteStopped"
-  > | undefined;
+  let result:
+    | Omit<
+        SmokeBrowserSemanticResult,
+        "cleanupSucceeded" | "stopped" | "serverStopped" | "viteStopped"
+      >
+    | undefined;
   let runError: unknown;
   let cleanupError: unknown;
 
@@ -88,7 +85,7 @@ export async function runSmokeBrowserSemantic(
 
     await runProcess("pnpm", ["--filter", "@agent-desktop-harness/http-server", "build"], {
       cwd: rootPath,
-      env: process.env
+      env: process.env,
     });
     httpServer = startHttpServer(rootPath, parsed.httpPort);
     const httpOutput = collectChildOutput(httpServer);
@@ -104,9 +101,9 @@ export async function runSmokeBrowserSemantic(
           workspaceDir: parsed.workspacePath,
           width: 1440,
           height: 900,
-          depth: 24
-        }
-      }
+          depth: 24,
+        },
+      },
     );
     sessionId = createResponse.session.id;
 
@@ -120,33 +117,33 @@ export async function runSmokeBrowserSemantic(
           browserExecutablePath: browser.path,
           viewport: {
             width: 1440,
-            height: 900
+            height: 900,
           },
-          label: "browser-semantic-open-demo"
-        }
-      }
+          label: "browser-semantic-open-demo",
+        },
+      },
     );
 
     const initialScreenshot = await browserScreenshot(
       fetchLike,
       httpBaseUrl,
       sessionId,
-      "browser-semantic-initial"
+      "browser-semantic-initial",
     );
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/browser/fill`, {
       method: "POST",
       body: {
         placeholder: "Type a message",
-        value: parsed.text
-      }
+        value: parsed.text,
+      },
     });
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}/browser/click`, {
       method: "POST",
       body: {
         role: "button",
         name: "Save message",
-        label: "browser-semantic-click-save"
-      }
+        label: "browser-semantic-click-save",
+      },
     });
     await assertBrowserText(fetchLike, httpBaseUrl, sessionId, "Status: saved");
     await assertBrowserText(fetchLike, httpBaseUrl, sessionId, parsed.text);
@@ -155,19 +152,19 @@ export async function runSmokeBrowserSemantic(
       body: {
         role: "button",
         name: "Open details",
-        label: "browser-semantic-click-details"
-      }
+        label: "browser-semantic-click-details",
+      },
     });
     await assertBrowserText(fetchLike, httpBaseUrl, sessionId, "Details panel is open");
     const detailsScreenshot = await browserScreenshot(
       fetchLike,
       httpBaseUrl,
       sessionId,
-      "browser-semantic-details-open"
+      "browser-semantic-details-open",
     );
 
     await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}`, {
-      method: "DELETE"
+      method: "DELETE",
     });
     stopped = true;
 
@@ -179,10 +176,7 @@ export async function runSmokeBrowserSemantic(
       httpPort: parsed.httpPort,
       evidencePath: createResponse.session.evidencePath,
       pageId: openResponse.page.pageId,
-      screenshots: [
-        initialScreenshot.screenshot.path,
-        detailsScreenshot.screenshot.path
-      ]
+      screenshots: [initialScreenshot.screenshot.path, detailsScreenshot.screenshot.path],
     };
   } catch (error) {
     runError = error;
@@ -191,7 +185,7 @@ export async function runSmokeBrowserSemantic(
       try {
         const httpBaseUrl = `http://127.0.0.1:${parsed.httpPort}`;
         await httpJsonRequest(fetchLike, `${httpBaseUrl}/sessions/${sessionId}`, {
-          method: "DELETE"
+          method: "DELETE",
         });
         stopped = true;
       } catch (error) {
@@ -233,13 +227,11 @@ export async function runSmokeBrowserSemantic(
     cleanupSucceeded: stopped && serverStopped && viteStopped,
     stopped,
     serverStopped,
-    viteStopped
+    viteStopped,
   };
 }
 
-export function parseSmokeBrowserSemanticArgs(
-  args: readonly string[]
-): SmokeBrowserSemanticArgs {
+export function parseSmokeBrowserSemanticArgs(args: readonly string[]): SmokeBrowserSemanticArgs {
   let workspacePath = defaultWorkspacePath();
   let vitePort = 5181;
   let httpPort = 7355;
@@ -279,7 +271,7 @@ export function parseSmokeBrowserSemanticArgs(
     workspacePath,
     vitePort,
     httpPort,
-    text
+    text,
   };
 }
 
@@ -295,20 +287,13 @@ function startViteServer(rootPath: string, port: number): ChildProcess {
 
   return spawn(
     process.execPath,
-    [
-      viteBin,
-      "--host",
-      VITE_URL_HOST,
-      "--port",
-      String(port),
-      "--strictPort"
-    ],
+    [viteBin, "--host", VITE_URL_HOST, "--port", String(port), "--strictPort"],
     {
       cwd: appPath,
       env: process.env,
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"]
-    }
+      stdio: ["ignore", "pipe", "pipe"],
+    },
   );
 }
 
@@ -318,10 +303,10 @@ function startHttpServer(rootPath: string, port: number): ChildProcess {
     env: {
       ...process.env,
       AGENT_DESKTOP_HARNESS_HOST: "127.0.0.1",
-      AGENT_DESKTOP_HARNESS_PORT: String(port)
+      AGENT_DESKTOP_HARNESS_PORT: String(port),
     },
     shell: false,
-    stdio: ["ignore", "pipe", "pipe"]
+    stdio: ["ignore", "pipe", "pipe"],
   });
 }
 
@@ -331,7 +316,7 @@ async function waitForHttpOk(
   server: { readonly exitCode: number | null; readonly signalCode: NodeJS.Signals | null },
   serverOutput: { readonly stdout: string; readonly stderr: string },
   label: string,
-  timeoutMs = 10_000
+  timeoutMs = 10_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
@@ -357,7 +342,7 @@ async function waitForHttpOk(
   throw new Error(
     `${label} server did not become ready within ${timeoutMs}ms: ${
       lastError instanceof Error ? lastError.message : String(lastError)
-    }`
+    }`,
   );
 }
 
@@ -366,7 +351,7 @@ async function waitForHttpJsonHealth(
   fetchLike: FetchLike,
   server: { readonly exitCode: number | null; readonly signalCode: NodeJS.Signals | null },
   serverOutput: { readonly stdout: string; readonly stderr: string },
-  timeoutMs = 10_000
+  timeoutMs = 10_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
@@ -379,7 +364,7 @@ async function waitForHttpJsonHealth(
     try {
       const result = await httpJsonRequest<{ readonly ok?: boolean }>(
         fetchLike,
-        `${baseUrl}/health`
+        `${baseUrl}/health`,
       );
       if (result.ok === true) {
         return;
@@ -394,7 +379,7 @@ async function waitForHttpJsonHealth(
   throw new Error(
     `Browser semantic HTTP smoke server did not become ready within ${timeoutMs}ms: ${
       lastError instanceof Error ? lastError.message : String(lastError)
-    }`
+    }`,
   );
 }
 
@@ -402,7 +387,7 @@ async function browserScreenshot(
   fetchLike: FetchLike,
   baseUrl: string,
   sessionId: string,
-  label: string
+  label: string,
 ): Promise<BrowserScreenshotResponse> {
   return await httpJsonRequest<BrowserScreenshotResponse>(
     fetchLike,
@@ -411,9 +396,9 @@ async function browserScreenshot(
       method: "POST",
       body: {
         label,
-        fullPage: false
-      }
-    }
+        fullPage: false,
+      },
+    },
   );
 }
 
@@ -421,36 +406,32 @@ async function assertBrowserText(
   fetchLike: FetchLike,
   baseUrl: string,
   sessionId: string,
-  text: string
+  text: string,
 ): Promise<void> {
   await httpJsonRequest(fetchLike, `${baseUrl}/sessions/${sessionId}/browser/assert-text`, {
     method: "POST",
     body: {
       text,
       timeoutMs: 5000,
-      label: `assert-${sanitizeLabel(text)}`
-    }
+      label: `assert-${sanitizeLabel(text)}`,
+    },
   });
 }
 
 function formatServerExitedMessage(
   label: string,
-  output: { readonly stdout: string; readonly stderr: string }
+  output: { readonly stdout: string; readonly stderr: string },
 ): string {
   return [
     `${label} server exited before it became ready.`,
     output.stderr.trim() ? `stderr:\n${output.stderr.trim()}` : undefined,
-    output.stdout.trim() ? `stdout:\n${output.stdout.trim()}` : undefined
+    output.stdout.trim() ? `stdout:\n${output.stdout.trim()}` : undefined,
   ]
     .filter(Boolean)
     .join("\n");
 }
 
-function requireValue(
-  args: readonly string[],
-  index: number,
-  optionName: string
-): string {
+function requireValue(args: readonly string[], index: number, optionName: string): string {
   const value = args[index + 1];
   if (!value) {
     throw new Error(`${optionName} requires a value.`);

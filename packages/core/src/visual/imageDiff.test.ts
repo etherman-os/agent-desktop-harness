@@ -1,8 +1,8 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
 import { PNG } from "pngjs";
 import { comparePngImages, comparePngImagesWithContainment } from "./imageDiff.js";
 
@@ -18,14 +18,14 @@ test("comparePngImages computes full-image PNG diffs", async () => {
       [255, 255, 255, 255],
       [0, 0, 0, 255],
       [0, 0, 0, 255],
-      [0, 0, 0, 255]
+      [0, 0, 0, 255],
     ]);
 
     const result = await comparePngImages({
       beforePath,
       afterPath,
       diffPath,
-      threshold: 0.1
+      threshold: 0.1,
     });
 
     assert.equal(result.comparedPixels, 4);
@@ -47,7 +47,7 @@ test("comparePngImages supports region comparison", async () => {
       [255, 255, 255, 255],
       [0, 0, 0, 255],
       [0, 0, 0, 255],
-      [0, 0, 0, 255]
+      [0, 0, 0, 255],
     ]);
 
     const result = await comparePngImages({
@@ -57,8 +57,8 @@ test("comparePngImages supports region comparison", async () => {
         x: 1,
         y: 0,
         width: 1,
-        height: 1
-      }
+        height: 1,
+      },
     });
 
     assert.equal(result.comparedPixels, 1);
@@ -81,9 +81,9 @@ test("comparePngImages rejects dimension mismatches", async () => {
       async () =>
         await comparePngImages({
           beforePath,
-          afterPath
+          afterPath,
         }),
-      /Image dimensions differ/
+      /Image dimensions differ/,
     );
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
@@ -100,7 +100,7 @@ test("comparePngImagesWithContainment counts inside and outside differences", as
     await writePng(afterPath, 3, 1, [
       [255, 255, 255, 255],
       [255, 255, 255, 255],
-      [0, 0, 0, 255]
+      [0, 0, 0, 255],
     ]);
 
     const result = await comparePngImagesWithContainment({
@@ -111,9 +111,9 @@ test("comparePngImagesWithContainment counts inside and outside differences", as
           x: 1,
           y: 0,
           width: 1,
-          height: 1
-        }
-      ]
+          height: 1,
+        },
+      ],
     });
 
     assert.equal(result.diffPixels, 2);
@@ -131,7 +131,7 @@ async function writePng(
   path: string,
   width: number,
   height: number,
-  pixels: readonly (readonly [number, number, number, number])[]
+  pixels: readonly (readonly [number, number, number, number])[],
 ): Promise<void> {
   const png = new PNG({ width, height });
   const fallback = pixels[0] ?? [0, 0, 0, 255];

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { DoctorReport } from "./doctor.js";
 import {
   ensureVisualQaSmokeReady,
   parseSmokeVisualBaselineArgs,
-  parseSmokeVisualQaArgs
+  parseSmokeVisualQaArgs,
 } from "./visualQaSmoke.js";
-import type { DoctorReport } from "./doctor.js";
 
 test("parseSmokeVisualQaArgs uses stable local demo defaults", () => {
   const parsed = parseSmokeVisualQaArgs([]);
@@ -25,7 +25,7 @@ test("parseSmokeVisualQaArgs accepts explicit ports and text", () => {
     "--http-port",
     "7367",
     "--text",
-    "visual qa message"
+    "visual qa message",
   ]);
 
   assert.equal(parsed.workspacePath, "/tmp/visual-qa-smoke");
@@ -35,14 +35,8 @@ test("parseSmokeVisualQaArgs accepts explicit ports and text", () => {
 });
 
 test("parseSmokeVisualQaArgs validates port values", () => {
-  assert.throws(
-    () => parseSmokeVisualQaArgs(["--vite-port", "0"]),
-    /Invalid port/
-  );
-  assert.throws(
-    () => parseSmokeVisualQaArgs(["--http-port", "70000"]),
-    /Invalid port/
-  );
+  assert.throws(() => parseSmokeVisualQaArgs(["--vite-port", "0"]), /Invalid port/);
+  assert.throws(() => parseSmokeVisualQaArgs(["--http-port", "70000"]), /Invalid port/);
 });
 
 test("parseSmokeVisualBaselineArgs uses stable local baseline defaults", () => {
@@ -69,7 +63,7 @@ test("parseSmokeVisualBaselineArgs accepts explicit baseline options", () => {
     "--baseline-name",
     "clean-state",
     "--suite",
-    "regression"
+    "regression",
   ]);
 
   assert.equal(parsed.workspacePath, "/tmp/visual-baseline-smoke");
@@ -81,14 +75,8 @@ test("parseSmokeVisualBaselineArgs accepts explicit baseline options", () => {
 });
 
 test("parseSmokeVisualBaselineArgs validates port values", () => {
-  assert.throws(
-    () => parseSmokeVisualBaselineArgs(["--vite-port", "0"]),
-    /Invalid port/
-  );
-  assert.throws(
-    () => parseSmokeVisualBaselineArgs(["--http-port", "70000"]),
-    /Invalid port/
-  );
+  assert.throws(() => parseSmokeVisualBaselineArgs(["--vite-port", "0"]), /Invalid port/);
+  assert.throws(() => parseSmokeVisualBaselineArgs(["--http-port", "70000"]), /Invalid port/);
 });
 
 test("ensureVisualQaSmokeReady fails when required dependencies are missing", () => {
@@ -100,13 +88,10 @@ test("ensureVisualQaSmokeReady fails when required dependencies are missing", ()
         name: "Xvfb",
         level: "required",
         installHint: "sudo apt install -y xvfb",
-        found: false
-      }
-    ]
+        found: false,
+      },
+    ],
   };
 
-  assert.throws(
-    () => ensureVisualQaSmokeReady(report),
-    /Missing required dependencies: Xvfb/
-  );
+  assert.throws(() => ensureVisualQaSmokeReady(report), /Missing required dependencies: Xvfb/);
 });

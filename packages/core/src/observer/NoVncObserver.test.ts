@@ -1,8 +1,8 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
 import {
   allocateTcpPort,
   buildNoVncProxyArgs,
@@ -10,7 +10,7 @@ import {
   buildX11VncArgs,
   makeNoVncUrl,
   normalizeObserverHost,
-  redactObserverStartDetails
+  redactObserverStartDetails,
 } from "./NoVncObserver.js";
 import { getLiveObserverStatus } from "./observerStatus.js";
 
@@ -19,7 +19,7 @@ test("observer command builders keep services local and view-only by default", (
     buildX11VncArgs({
       display: ":191",
       vncPort: 5901,
-      viewOnly: true
+      viewOnly: true,
     }),
     [
       "-display",
@@ -31,15 +31,15 @@ test("observer command builders keep services local and view-only by default", (
       "-shared",
       "-quiet",
       "-viewonly",
-      "-nopw"
-    ]
+      "-nopw",
+    ],
   );
 
   assert.deepEqual(buildNoVncProxyArgs({ host: "127.0.0.1", webPort: 6081, vncPort: 5901 }), [
     "--listen",
     "127.0.0.1:6081",
     "--vnc",
-    "127.0.0.1:5901"
+    "127.0.0.1:5901",
   ]);
 
   assert.deepEqual(
@@ -47,9 +47,9 @@ test("observer command builders keep services local and view-only by default", (
       host: "127.0.0.1",
       webPort: 6081,
       vncPort: 5901,
-      noVncWebRootPath: "/usr/share/novnc"
+      noVncWebRootPath: "/usr/share/novnc",
     }),
-    ["--web", "/usr/share/novnc", "127.0.0.1:6081", "127.0.0.1:5901"]
+    ["--web", "/usr/share/novnc", "127.0.0.1:6081", "127.0.0.1:5901"],
   );
 });
 
@@ -59,7 +59,7 @@ test("observer rejects non-local hosts and builds noVNC URL", () => {
 
   assert.equal(
     makeNoVncUrl("127.0.0.1", 6081, true),
-    "http://127.0.0.1:6081/vnc.html?autoconnect=1&resize=scale&view_only=1"
+    "http://127.0.0.1:6081/vnc.html?autoconnect=1&resize=scale&view_only=1",
   );
 });
 
@@ -77,9 +77,9 @@ test("observer status detects binaries and noVNC web root", async () => {
 
     const status = await getLiveObserverStatus({
       env: {
-        PATH: bin
+        PATH: bin,
       },
-      noVncWebRootCandidates: [webRoot]
+      noVncWebRootCandidates: [webRoot],
     });
 
     assert.equal(status.available, true);
@@ -94,9 +94,9 @@ test("observer status detects binaries and noVNC web root", async () => {
 test("observer status reports unavailable dependencies clearly", async () => {
   const status = await getLiveObserverStatus({
     env: {
-      PATH: ""
+      PATH: "",
     },
-    noVncWebRootCandidates: []
+    noVncWebRootCandidates: [],
   });
 
   assert.equal(status.available, false);
@@ -108,7 +108,7 @@ test("observer start detail redaction omits raw password", () => {
   const details = redactObserverStartDetails({
     password: "secret-value",
     vncPort: 5901,
-    webPort: 6081
+    webPort: 6081,
   });
 
   assert.equal(details.passwordProvided, true);

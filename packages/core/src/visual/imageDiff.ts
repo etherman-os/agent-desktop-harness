@@ -7,14 +7,12 @@ import type {
   ImageContainmentDiffResult,
   ImageDiffOptions,
   ImageDiffResult,
-  ImageRegion
+  ImageRegion,
 } from "./visualTypes.js";
 
 const DEFAULT_THRESHOLD = 0.1;
 
-export async function comparePngImages(
-  options: ImageDiffOptions
-): Promise<ImageDiffResult> {
+export async function comparePngImages(options: ImageDiffOptions): Promise<ImageDiffResult> {
   const threshold = normalizeThreshold(options.threshold);
   const before = await readPngImage(options.beforePath);
   const after = await readPngImage(options.afterPath);
@@ -28,7 +26,7 @@ export async function comparePngImages(
   const afterRegion = copyRegion(after, region);
   const diff = new PNG({
     width: region.width,
-    height: region.height
+    height: region.height,
   });
   const diffPixels = pixelmatch(
     beforeRegion.data,
@@ -37,8 +35,8 @@ export async function comparePngImages(
     region.width,
     region.height,
     {
-      threshold
-    }
+      threshold,
+    },
   );
   const comparedPixels = region.width * region.height;
 
@@ -53,12 +51,12 @@ export async function comparePngImages(
     diffPixels,
     diffPixelRatio: comparedPixels > 0 ? diffPixels / comparedPixels : 0,
     threshold,
-    warnings: []
+    warnings: [],
   };
 }
 
 export async function comparePngImagesWithContainment(
-  options: ImageContainmentDiffOptions
+  options: ImageContainmentDiffOptions,
 ): Promise<ImageContainmentDiffResult> {
   const threshold = normalizeThreshold(options.threshold);
   const before = await readPngImage(options.beforePath);
@@ -73,22 +71,15 @@ export async function comparePngImagesWithContainment(
   }
 
   const allowedRegions = options.allowedRegions.map((region) =>
-    normalizeImageRegion(region, before.width, before.height)
+    normalizeImageRegion(region, before.width, before.height),
   );
   const diff = new PNG({
     width: before.width,
-    height: before.height
+    height: before.height,
   });
-  const diffPixels = pixelmatch(
-    before.data,
-    after.data,
-    diff.data,
-    before.width,
-    before.height,
-    {
-      threshold
-    }
-  );
+  const diffPixels = pixelmatch(before.data, after.data, diff.data, before.width, before.height, {
+    threshold,
+  });
   const comparedPixels = before.width * before.height;
   const mask = makeRegionMask(before.width, before.height, allowedRegions);
   let insideComparedPixels = 0;
@@ -129,8 +120,9 @@ export async function comparePngImagesWithContainment(
     insideDiffPixelRatio: insideComparedPixels > 0 ? insideDiffPixels / insideComparedPixels : 0,
     outsideComparedPixels,
     outsideDiffPixels,
-    outsideDiffPixelRatio: outsideComparedPixels > 0 ? outsideDiffPixels / outsideComparedPixels : 0,
-    warnings: []
+    outsideDiffPixelRatio:
+      outsideComparedPixels > 0 ? outsideDiffPixels / outsideComparedPixels : 0,
+    warnings: [],
   };
 }
 
@@ -145,7 +137,7 @@ export async function readPngSize(path: string): Promise<{
   const image = await readPngImage(path);
   return {
     width: image.width,
-    height: image.height
+    height: image.height,
   };
 }
 
@@ -169,14 +161,14 @@ export function normalizeRatio(value: number, label: string): number {
 export function normalizeImageRegion(
   region: ImageRegion | undefined,
   imageWidth: number,
-  imageHeight: number
+  imageHeight: number,
 ): ImageRegion {
   if (!region) {
     return {
       x: 0,
       y: 0,
       width: imageWidth,
-      height: imageHeight
+      height: imageHeight,
     };
   }
 
@@ -188,11 +180,13 @@ export function normalizeImageRegion(
     region.width <= 0 ||
     region.height <= 0
   ) {
-    throw new ProcessError("Visual QA region requires integer x/y and positive integer width/height.");
+    throw new ProcessError(
+      "Visual QA region requires integer x/y and positive integer width/height.",
+    );
   }
   if (region.x + region.width > imageWidth || region.y + region.height > imageHeight) {
     throw new ProcessError(
-      `Visual QA region ${region.x},${region.y},${region.width},${region.height} is outside image bounds ${imageWidth}x${imageHeight}.`
+      `Visual QA region ${region.x},${region.y},${region.width},${region.height} is outside image bounds ${imageWidth}x${imageHeight}.`,
     );
   }
 
@@ -202,7 +196,7 @@ export function normalizeImageRegion(
 export function clampImageRegion(
   region: ImageRegion,
   imageWidth: number,
-  imageHeight: number
+  imageHeight: number,
 ): ImageRegion {
   const x = Math.max(0, Math.min(imageWidth, Math.floor(region.x)));
   const y = Math.max(0, Math.min(imageHeight, Math.floor(region.y)));
@@ -217,7 +211,7 @@ export function clampImageRegion(
     x,
     y,
     width,
-    height
+    height,
   };
 }
 
@@ -233,7 +227,7 @@ function copyRegion(image: PNG, region: ImageRegion): PNG {
 
   const cropped = new PNG({
     width: region.width,
-    height: region.height
+    height: region.height,
   });
 
   for (let y = 0; y < region.height; y += 1) {
@@ -252,17 +246,17 @@ function copyRegion(image: PNG, region: ImageRegion): PNG {
 
 function throwDimensionMismatch(
   before: { readonly width: number; readonly height: number },
-  after: { readonly width: number; readonly height: number }
+  after: { readonly width: number; readonly height: number },
 ): never {
   throw new ProcessError(
-    `Image dimensions differ: before=${before.width}x${before.height}, after=${after.width}x${after.height}.`
+    `Image dimensions differ: before=${before.width}x${before.height}, after=${after.width}x${after.height}.`,
   );
 }
 
 function makeRegionMask(
   width: number,
   height: number,
-  regions: readonly ImageRegion[]
+  regions: readonly ImageRegion[],
 ): Uint8Array {
   const mask = new Uint8Array(width * height);
   for (const region of regions) {

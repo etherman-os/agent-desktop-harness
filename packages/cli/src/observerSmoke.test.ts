@@ -1,7 +1,7 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import { parseSmokeObserverArgs, runSmokeObserver } from "./observerSmoke.js";
+import test from "node:test";
 import type { DoctorReport } from "./doctor.js";
+import { parseSmokeObserverArgs, runSmokeObserver } from "./observerSmoke.js";
 
 test("parseSmokeObserverArgs accepts optional ports", () => {
   const parsed = parseSmokeObserverArgs([
@@ -10,7 +10,7 @@ test("parseSmokeObserverArgs accepts optional ports", () => {
     "--vnc-port",
     "5901",
     "--web-port",
-    "6081"
+    "6081",
   ]);
 
   assert.equal(parsed.workspacePath, "/tmp/work");
@@ -26,9 +26,9 @@ test("runSmokeObserver skips clearly when observer dependencies are missing", as
         available: false,
         warnings: [],
         errors: ["x11vnc is missing."],
-        installHints: ["sudo apt install -y x11vnc novnc websockify"]
-      })
-    } as never
+        installHints: ["sudo apt install -y x11vnc novnc websockify"],
+      }),
+    } as never,
   });
 
   assert.equal(result.skipped, true);
@@ -40,6 +40,6 @@ function readyDoctorReport(): DoctorReport {
   return {
     ready: true,
     status: "ready",
-    dependencies: []
+    dependencies: [],
   };
 }

@@ -1,11 +1,6 @@
 export type SessionId = string;
 
-export type DriverKind =
-  | "browser"
-  | "tauri"
-  | "electron"
-  | "native"
-  | "unknown";
+export type DriverKind = "browser" | "tauri" | "electron" | "native" | "unknown";
 
 export interface DisplayNumberRange {
   readonly min: number;

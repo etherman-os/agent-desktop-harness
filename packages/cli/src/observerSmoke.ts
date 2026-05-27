@@ -1,17 +1,17 @@
-import { SessionManager } from "@agent-desktop-harness/core";
 import type {
   DesktopSession,
   LiveObserverRef,
-  LiveObserverStatus
+  LiveObserverStatus,
 } from "@agent-desktop-harness/core";
+import { SessionManager } from "@agent-desktop-harness/core";
 import {
+  type DoctorReport,
   formatMissingRequiredMessage,
   getMissingRequiredDependencies,
   runDoctor,
-  type DoctorReport
 } from "./doctor.js";
-import { defaultWorkspacePath } from "./workspace.js";
 import type { FetchLike } from "./httpSmoke.js";
+import { defaultWorkspacePath } from "./workspace.js";
 
 export interface ObserverStatusCommandResult {
   readonly status: LiveObserverStatus;
@@ -44,21 +44,20 @@ export interface SmokeObserverOptions {
 }
 
 export async function runObserverStatusCommand(
-  manager = new SessionManager()
+  manager = new SessionManager(),
 ): Promise<ObserverStatusCommandResult> {
   return {
-    status: await manager.getLiveObserverStatus()
+    status: await manager.getLiveObserverStatus(),
   };
 }
 
 export async function runSmokeObserver(
   args: readonly string[],
-  options: SmokeObserverOptions = {}
+  options: SmokeObserverOptions = {},
 ): Promise<SmokeObserverResult> {
   const parsed = parseSmokeObserverArgs(args);
   const report =
-    options.doctorReport ??
-    (await (options.runDoctor ?? (async () => await runDoctor()))());
+    options.doctorReport ?? (await (options.runDoctor ?? (async () => await runDoctor()))());
   ensureObserverSmokeBaseReady(report);
 
   const manager = options.manager ?? new SessionManager();
@@ -69,12 +68,12 @@ export async function runSmokeObserver(
       skipReason: [
         "Live observer dependencies are unavailable.",
         ...observerStatus.errors,
-        ...observerStatus.installHints.map((hint) => `Install hint: ${hint}`)
+        ...observerStatus.installHints.map((hint) => `Install hint: ${hint}`),
       ].join(" "),
       observerStatus,
       cleanupSucceeded: true,
       observerStopped: false,
-      stopped: false
+      stopped: false,
     };
   }
 
@@ -83,23 +82,22 @@ export async function runSmokeObserver(
   let observer: LiveObserverRef | undefined;
   let observerStopped = false;
   let stopped = false;
-  let result: Omit<
-    SmokeObserverResult,
-    "cleanupSucceeded" | "observerStopped" | "stopped"
-  > | undefined;
+  let result:
+    | Omit<SmokeObserverResult, "cleanupSucceeded" | "observerStopped" | "stopped">
+    | undefined;
   let runError: unknown;
   let cleanupError: unknown;
 
   try {
     session = await manager.createSession({
-      workspacePath: parsed.workspacePath
+      workspacePath: parsed.workspacePath,
     });
 
     observer = await manager.startLiveObserver(session.id, {
       vncPort: parsed.vncPort,
       webPort: parsed.webPort,
       viewOnly: true,
-      label: "observer-smoke"
+      label: "observer-smoke",
     });
 
     const response = await fetchLike(observer.url);
@@ -124,7 +122,7 @@ export async function runSmokeObserver(
       display: session.display,
       evidencePath: session.evidencePath,
       observer,
-      observerHttpStatus: response.status
+      observerHttpStatus: response.status,
     };
   } catch (error) {
     runError = error;
@@ -161,7 +159,7 @@ export async function runSmokeObserver(
     ...result,
     cleanupSucceeded: observerStopped && stopped,
     observerStopped,
-    stopped
+    stopped,
   };
 }
 
@@ -197,7 +195,7 @@ export function parseSmokeObserverArgs(args: readonly string[]): SmokeObserverAr
   return {
     workspacePath,
     vncPort,
-    webPort
+    webPort,
   };
 }
 
@@ -216,11 +214,7 @@ function parsePort(value: string): number {
   return port;
 }
 
-function requireValue(
-  args: readonly string[],
-  index: number,
-  optionName: string
-): string {
+function requireValue(args: readonly string[], index: number, optionName: string): string {
   const value = args[index + 1];
   if (!value) {
     throw new Error(`${optionName} requires a value.`);

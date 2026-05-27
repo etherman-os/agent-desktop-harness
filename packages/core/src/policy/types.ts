@@ -12,8 +12,5 @@ export interface PolicyDecision {
 }
 
 export interface PolicyEvaluator {
-  evaluateSessionStart(
-    config: SessionConfig,
-    policy: HarnessPolicy
-  ): Promise<PolicyDecision>;
+  evaluateSessionStart(config: SessionConfig, policy: HarnessPolicy): Promise<PolicyDecision>;
 }

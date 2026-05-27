@@ -2,14 +2,10 @@ import { spawn } from "node:child_process";
 import { join } from "node:path";
 import type { DoctorReport } from "./doctor.js";
 import { runDoctor } from "./doctor.js";
+import { collectChildOutput, runProcess, stopChildProcess } from "./processUtils.js";
+import { repoRootPath } from "./repo.js";
 import { ensureSmokeReady } from "./smoke.js";
 import { defaultWorkspacePath } from "./workspace.js";
-import { repoRootPath } from "./repo.js";
-import {
-  collectChildOutput,
-  runProcess,
-  stopChildProcess
-} from "./processUtils.js";
 
 export interface SmokeHttpArgs {
   readonly workspacePath: string;
@@ -46,7 +42,7 @@ export type FetchLike = (
     readonly method?: string;
     readonly headers?: Readonly<Record<string, string>>;
     readonly body?: string;
-  }
+  },
 ) => Promise<HttpResponseLike>;
 
 export interface HttpResponseLike {
@@ -57,18 +53,17 @@ export interface HttpResponseLike {
 
 export async function runSmokeHttp(
   args: readonly string[],
-  options: SmokeHttpOptions = {}
+  options: SmokeHttpOptions = {},
 ): Promise<SmokeHttpResult> {
   const parsed = parseSmokeHttpArgs(args);
   const report =
-    options.doctorReport ??
-    (await (options.runDoctor ?? (async () => await runDoctor()))());
+    options.doctorReport ?? (await (options.runDoctor ?? (async () => await runDoctor()))());
   ensureSmokeReady(report, "xterm");
 
   const rootPath = repoRootPath();
   await runProcess("pnpm", ["--filter", "@agent-desktop-harness/http-server", "build"], {
     cwd: rootPath,
-    env: process.env
+    env: process.env,
   });
 
   const server = spawn(process.execPath, [join(rootPath, "packages/http-server/dist/index.js")], {
@@ -76,10 +71,10 @@ export async function runSmokeHttp(
     env: {
       ...process.env,
       AGENT_DESKTOP_HARNESS_HOST: "127.0.0.1",
-      AGENT_DESKTOP_HARNESS_PORT: String(parsed.port)
+      AGENT_DESKTOP_HARNESS_PORT: String(parsed.port),
     },
     shell: false,
-    stdio: ["ignore", "pipe", "pipe"]
+    stdio: ["ignore", "pipe", "pipe"],
   });
   const serverOutput = collectChildOutput(server);
   const fetchLike = options.fetch ?? globalThis.fetch;
@@ -89,10 +84,7 @@ export async function runSmokeHttp(
   let evidencePath: string | undefined;
   let stopped = false;
   let serverStopped = false;
-  let result: Omit<
-    SmokeHttpResult,
-    "cleanupSucceeded" | "stopped" | "serverStopped"
-  > | undefined;
+  let result: Omit<SmokeHttpResult, "cleanupSucceeded" | "stopped" | "serverStopped"> | undefined;
   let runError: unknown;
   let cleanupError: unknown;
 
@@ -110,10 +102,10 @@ export async function runSmokeHttp(
           height: 900,
           depth: 24,
           policy: {
-            allowedCommands: ["xterm"]
-          }
-        }
-      }
+            allowedCommands: ["xterm"],
+          },
+        },
+      },
     );
     sessionId = createResponse.session.id;
     evidencePath = createResponse.session.evidencePath;
@@ -124,8 +116,8 @@ export async function runSmokeHttp(
         command: "xterm",
         args: [],
         cwd: parsed.workspacePath,
-        label: "http-smoke-xterm"
-      }
+        label: "http-smoke-xterm",
+      },
     });
 
     const stableResponse = await httpJsonRequest<WaitForStableScreenResponse>(
@@ -140,9 +132,9 @@ export async function runSmokeHttp(
           label: "http-smoke-stable",
           mode: "tolerant",
           fileSizeToleranceBytes: 2048,
-          retainOnlyLast: true
-        }
-      }
+          retainOnlyLast: true,
+        },
+      },
     );
     const initialScreenshot = await httpJsonRequest<ScreenshotResponse>(
       fetchLike,
@@ -150,9 +142,9 @@ export async function runSmokeHttp(
       {
         method: "POST",
         body: {
-          label: "http-smoke-initial"
-        }
-      }
+          label: "http-smoke-initial",
+        },
+      },
     );
     const windowResponse = await httpJsonRequest<WaitForWindowResponse>(
       fetchLike,
@@ -162,16 +154,16 @@ export async function runSmokeHttp(
         body: {
           excludeDevtools: true,
           preferLargest: true,
-          timeoutMs: 5000
-        }
-      }
+          timeoutMs: 5000,
+        },
+      },
     );
 
     await httpJsonRequest(fetchLike, `${baseUrl}/sessions/${sessionId}/focus-window`, {
       method: "POST",
       body: {
-        id: windowResponse.window.id
-      }
+        id: windowResponse.window.id,
+      },
     });
     await httpJsonRequest(fetchLike, `${baseUrl}/sessions/${sessionId}/click`, {
       method: "POST",
@@ -179,15 +171,15 @@ export async function runSmokeHttp(
         x: 100,
         y: 100,
         button: "left",
-        label: "http-smoke-click"
-      }
+        label: "http-smoke-click",
+      },
     });
     await httpJsonRequest(fetchLike, `${baseUrl}/sessions/${sessionId}/type-text`, {
       method: "POST",
       body: {
         text: parsed.text,
-        label: "http-smoke-type"
-      }
+        label: "http-smoke-type",
+      },
     });
     const afterTypeScreenshot = await httpJsonRequest<ScreenshotResponse>(
       fetchLike,
@@ -195,36 +187,33 @@ export async function runSmokeHttp(
       {
         method: "POST",
         body: {
-          label: "http-smoke-after-type"
-        }
-      }
+          label: "http-smoke-after-type",
+        },
+      },
     );
 
     await httpJsonRequest(fetchLike, `${baseUrl}/sessions/${sessionId}`, {
-      method: "DELETE"
+      method: "DELETE",
     });
     stopped = true;
 
     const reportResponse = await httpJsonRequest<EvidenceReportResponse>(
       fetchLike,
-      `${baseUrl}/sessions/${sessionId}/evidence/report`
+      `${baseUrl}/sessions/${sessionId}/evidence/report`,
     );
 
     result = {
       sessionId,
       port: parsed.port,
       evidencePath,
-      screenshots: [
-        initialScreenshot.screenshot.path,
-        afterTypeScreenshot.screenshot.path
-      ],
+      screenshots: [initialScreenshot.screenshot.path, afterTypeScreenshot.screenshot.path],
       stableScreen: {
         stable: stableResponse.result.stable,
         checks: stableResponse.result.checks,
         elapsedMs: stableResponse.result.elapsedMs,
-        lastScreenshotPath: stableResponse.result.lastScreenshot?.path
+        lastScreenshotPath: stableResponse.result.lastScreenshot?.path,
       },
-      reportPath: reportResponse.path
+      reportPath: reportResponse.path,
     };
   } catch (error) {
     runError = error;
@@ -232,7 +221,7 @@ export async function runSmokeHttp(
     if (sessionId && !stopped) {
       try {
         await httpJsonRequest(fetchLike, `${baseUrl}/sessions/${sessionId}`, {
-          method: "DELETE"
+          method: "DELETE",
         });
         stopped = true;
       } catch (error) {
@@ -262,7 +251,7 @@ export async function runSmokeHttp(
     ...result,
     cleanupSucceeded: stopped && serverStopped,
     stopped,
-    serverStopped
+    serverStopped,
   };
 }
 
@@ -298,7 +287,7 @@ export function parseSmokeHttpArgs(args: readonly string[]): SmokeHttpArgs {
   return {
     workspacePath,
     port,
-    text
+    text,
   };
 }
 
@@ -308,7 +297,7 @@ export async function httpJsonRequest<T>(
   options: {
     readonly method?: string;
     readonly body?: unknown;
-  } = {}
+  } = {},
 ): Promise<T> {
   const response = await fetchLike(url, {
     method: options.method ?? "GET",
@@ -316,9 +305,9 @@ export async function httpJsonRequest<T>(
       options.body === undefined
         ? undefined
         : {
-            "content-type": "application/json"
+            "content-type": "application/json",
           },
-    body: options.body === undefined ? undefined : JSON.stringify(options.body)
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
   const text = await response.text();
   const body = text.trim().length > 0 ? JSON.parse(text) : undefined;
@@ -342,7 +331,7 @@ async function waitForHttpHealth(
   fetchLike: FetchLike,
   server: { readonly exitCode: number | null; readonly signalCode: NodeJS.Signals | null },
   serverOutput: { readonly stdout: string; readonly stderr: string },
-  timeoutMs = 10_000
+  timeoutMs = 10_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError: unknown;
@@ -353,17 +342,17 @@ async function waitForHttpHealth(
         [
           "HTTP smoke server exited before /health became ready.",
           serverOutput.stderr.trim() ? `stderr:\n${serverOutput.stderr.trim()}` : undefined,
-          serverOutput.stdout.trim() ? `stdout:\n${serverOutput.stdout.trim()}` : undefined
+          serverOutput.stdout.trim() ? `stdout:\n${serverOutput.stdout.trim()}` : undefined,
         ]
           .filter(Boolean)
-          .join("\n")
+          .join("\n"),
       );
     }
 
     try {
       const result = await httpJsonRequest<{ readonly ok?: boolean }>(
         fetchLike,
-        `${baseUrl}/health`
+        `${baseUrl}/health`,
       );
       if (result.ok === true) {
         return;
@@ -378,22 +367,22 @@ async function waitForHttpHealth(
   throw new Error(
     `HTTP smoke server did not become ready within ${timeoutMs}ms: ${
       lastError instanceof Error ? lastError.message : String(lastError)
-    }`
+    }`,
   );
 }
 
-async function waitForHttpWindows(
+async function _waitForHttpWindows(
   fetchLike: FetchLike,
   baseUrl: string,
   sessionId: string,
-  timeoutMs = 5000
+  timeoutMs = 5000,
 ): Promise<WindowInfo[]> {
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
     const response = await httpJsonRequest<WindowsResponse>(
       fetchLike,
-      `${baseUrl}/sessions/${sessionId}/windows`
+      `${baseUrl}/sessions/${sessionId}/windows`,
     );
     if (response.windows.length > 0) {
       return response.windows;
@@ -404,11 +393,7 @@ async function waitForHttpWindows(
   throw new Error(`No windows appeared within ${timeoutMs}ms during smoke-http.`);
 }
 
-function requireValue(
-  args: readonly string[],
-  index: number,
-  optionName: string
-): string {
+function requireValue(args: readonly string[], index: number, optionName: string): string {
   const value = args[index + 1];
   if (!value) {
     throw new Error(`${optionName} requires a value.`);

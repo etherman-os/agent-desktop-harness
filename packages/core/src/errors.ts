@@ -2,7 +2,7 @@ export class HarnessError extends Error {
   constructor(
     readonly code: string,
     message: string,
-    readonly cause?: unknown
+    readonly cause?: unknown,
   ) {
     super(message);
     this.name = "HarnessError";
@@ -11,11 +11,7 @@ export class HarnessError extends Error {
 
 export class MissingDependencyError extends HarnessError {
   constructor(command: string, installHint: string, cause?: unknown) {
-    super(
-      "MISSING_DEPENDENCY",
-      `Missing dependency: ${command}. ${installHint}`,
-      cause
-    );
+    super("MISSING_DEPENDENCY", `Missing dependency: ${command}. ${installHint}`, cause);
     this.name = "MissingDependencyError";
   }
 }

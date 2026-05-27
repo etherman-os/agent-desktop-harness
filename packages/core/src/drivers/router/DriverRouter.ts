@@ -1,8 +1,3 @@
-export {
-  makeDriverRouterStatus,
-  selectDriver,
-  isSemanticDriver
-} from "./driverSelection.js";
 export type {
   AppActionResult,
   AppActionTarget,
@@ -19,5 +14,10 @@ export type {
   DriverRouterStatus,
   DriverSelectionMode,
   RoutedAppRecord,
-  RoutedDriverKind
+  RoutedDriverKind,
 } from "./driverRouterTypes.js";
+export {
+  isSemanticDriver,
+  makeDriverRouterStatus,
+  selectDriver,
+} from "./driverSelection.js";

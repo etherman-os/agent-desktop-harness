@@ -23,42 +23,39 @@ export interface BrowserLaunchConfig {
 
 export type BinaryChecker = (
   name: string,
-  env?: NodeJS.ProcessEnv
+  env?: NodeJS.ProcessEnv,
 ) => Promise<{ readonly found: boolean; readonly path?: string }>;
 
 export const GUI_BROWSER_CANDIDATES: readonly BrowserCandidate[] = [
   {
     command: "chromium",
     kind: "chromium",
-    installHint: "sudo apt install -y chromium"
+    installHint: "sudo apt install -y chromium",
   },
   {
     command: "chromium-browser",
     kind: "chromium",
-    installHint: "sudo apt install -y chromium-browser"
+    installHint: "sudo apt install -y chromium-browser",
   },
   {
     command: "google-chrome",
     kind: "chromium",
-    installHint: "Install Google Chrome or use google-chrome-stable if available."
+    installHint: "Install Google Chrome or use google-chrome-stable if available.",
   },
   {
     command: "google-chrome-stable",
     kind: "chromium",
-    installHint: "Install Google Chrome Stable from the official package."
+    installHint: "Install Google Chrome Stable from the official package.",
   },
   {
     command: "firefox",
     kind: "firefox",
-    installHint: "sudo apt install -y firefox"
-  }
+    installHint: "sudo apt install -y firefox",
+  },
 ];
 
 export async function detectGuiBrowser(
-  options: {
-    readonly env?: NodeJS.ProcessEnv;
-    readonly check?: BinaryChecker;
-  } = {}
+  options: { readonly env?: NodeJS.ProcessEnv; readonly check?: BinaryChecker } = {},
 ): Promise<GuiBrowser | undefined> {
   const env = options.env ?? process.env;
   const check = options.check ?? checkBinary;
@@ -67,16 +64,14 @@ export async function detectGuiBrowser(
   if (override) {
     const binary = await check(override, env);
     if (!binary.found) {
-      throw new Error(
-        `AGENT_DESKTOP_HARNESS_BROWSER is set but is not executable: ${override}`
-      );
+      throw new Error(`AGENT_DESKTOP_HARNESS_BROWSER is set but is not executable: ${override}`);
     }
 
     return {
       command: binary.path ?? override,
       path: binary.path ?? override,
       kind: inferBrowserKind(override),
-      source: "env"
+      source: "env",
     };
   }
 
@@ -87,7 +82,7 @@ export async function detectGuiBrowser(
         command: candidate.command,
         path: binary.path,
         kind: candidate.kind,
-        source: "path"
+        source: "path",
       };
     }
   }
@@ -98,21 +93,12 @@ export async function detectGuiBrowser(
 export function buildBrowserLaunchConfig(
   browser: GuiBrowser,
   profileDir: string,
-  url: string
+  url: string,
 ): BrowserLaunchConfig {
   if (browser.kind === "firefox") {
     return {
       command: browser.command,
-      args: [
-        "--profile",
-        profileDir,
-        "--new-instance",
-        "--width",
-        "1180",
-        "--height",
-        "760",
-        url
-      ]
+      args: ["--profile", profileDir, "--new-instance", "--width", "1180", "--height", "760", url],
     };
   }
 
@@ -126,8 +112,8 @@ export function buildBrowserLaunchConfig(
       "--window-size=1180,760",
       "--window-position=130,70",
       `--user-data-dir=${profileDir}`,
-      url
-    ]
+      url,
+    ],
   };
 }
 
@@ -138,7 +124,7 @@ export function formatMissingGuiBrowserMessage(): string {
     "  sudo apt install -y chromium-browser",
     "  sudo apt install -y chromium",
     "  sudo apt install -y firefox",
-    "or set AGENT_DESKTOP_HARNESS_BROWSER=/path/to/browser"
+    "or set AGENT_DESKTOP_HARNESS_BROWSER=/path/to/browser",
   ].join("\n");
 }
 

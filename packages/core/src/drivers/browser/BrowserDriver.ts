@@ -9,5 +9,5 @@ export type {
   BrowserPageRef,
   BrowserPressOptions,
   BrowserScreenshotOptions,
-  BrowserSelectorTarget
+  BrowserSelectorTarget,
 } from "./browserTypes.js";

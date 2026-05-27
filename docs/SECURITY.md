@@ -43,9 +43,9 @@ The MCP server exposes `desktop_launch_app` with structured `{ command, args, cw
 
 ## HTTP Local Binding
 
-The HTTP server is intended for local agent orchestration. It binds to `127.0.0.1` by default and should not be exposed to the public internet. CORS is not enabled by default.
+The HTTP server is intended for local agent orchestration. It binds to `127.0.0.1` by default and rejects non-loopback bind hosts. Allowed bind hosts are `127.0.0.1`, `localhost`, and `::1`. CORS is not enabled by default.
 
-Do not run the HTTP server on `0.0.0.0` or behind a public proxy without adding an authentication and authorization layer first.
+Do not run the HTTP server behind a public proxy without adding an authentication and authorization layer first.
 
 ## Live Observer Local Binding
 

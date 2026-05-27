@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ensureSmokeReady, parseSmokeX11Args } from "./smoke.js";
 import type { DoctorReport } from "./doctor.js";
+import { ensureSmokeReady, parseSmokeX11Args } from "./smoke.js";
 
 test("parseSmokeX11Args uses the xterm smoke defaults", () => {
   const parsed = parseSmokeX11Args([]);
@@ -20,15 +20,12 @@ test("ensureSmokeReady fails clearly when required dependencies are missing", ()
         name: "Xvfb",
         level: "required",
         installHint: "sudo apt install -y xvfb",
-        found: false
-      }
-    ]
+        found: false,
+      },
+    ],
   };
 
-  assert.throws(
-    () => ensureSmokeReady(report, "xterm"),
-    /Missing required dependencies: Xvfb/
-  );
+  assert.throws(() => ensureSmokeReady(report, "xterm"), /Missing required dependencies: Xvfb/);
 });
 
 test("ensureSmokeReady requires xterm for the default smoke demo", () => {
@@ -40,15 +37,12 @@ test("ensureSmokeReady requires xterm for the default smoke demo", () => {
         name: "xterm",
         level: "optional",
         installHint: "sudo apt install -y xterm",
-        found: false
-      }
-    ]
+        found: false,
+      },
+    ],
   };
 
-  assert.throws(
-    () => ensureSmokeReady(report, "xterm"),
-    /Missing optional smoke dependency/
-  );
+  assert.throws(() => ensureSmokeReady(report, "xterm"), /Missing optional smoke dependency/);
 });
 
 test("ensureSmokeReady allows a custom command without xterm", () => {
@@ -60,9 +54,9 @@ test("ensureSmokeReady allows a custom command without xterm", () => {
         name: "xterm",
         level: "optional",
         installHint: "sudo apt install -y xterm",
-        found: false
-      }
-    ]
+        found: false,
+      },
+    ],
   };
 
   assert.doesNotThrow(() => ensureSmokeReady(report, "custom-gui"));
