@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck-lint-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+
+      - run: pnpm lint
+
+      - run: pnpm test
+
+  smoke-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: typecheck-lint-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb openbox x11-utils scrot xdotool wmctrl xterm chromium-browser
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build
+
+      - name: Run smoke tests
+        run: |
+          pnpm smoke:x11
+          pnpm smoke:http
+          pnpm smoke:mcp
+          pnpm smoke:vite:http
+          pnpm smoke:vite:mcp
+          pnpm smoke:browser-semantic
+          pnpm smoke:driver-router
+          pnpm smoke:visual-qa
+          pnpm smoke:visual-baseline
+          pnpm smoke:annotation-repair
