@@ -1,6 +1,6 @@
 {
   "name": "agent-desktop-harness",
-  "version": "0.0.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Linux-first GUI QA and visual handoff cockpit for coding agents.",
   "license": "Apache-2.0",

@@ -1,6 +1,6 @@
 {
   "name": "@agent-desktop-harness/cli",
-  "version": "0.0.0",
+  "version": "0.2.0",
   "description": "CLI smoke and utility commands for agent-desktop-harness.",
   "license": "Apache-2.0",
   "type": "module",

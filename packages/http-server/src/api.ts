@@ -373,7 +373,7 @@ export class DesktopHttpApi {
     return {
       ok: true,
       service: "agent-desktop-harness-http",
-      version: "0.0.0",
+      version: "0.2.0",
     };
   }
 

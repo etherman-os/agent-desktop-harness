@@ -1,6 +1,6 @@
 {
   "name": "@agent-desktop-harness/core",
-  "version": "0.0.0",
+  "version": "0.2.0",
   "description": "Core engine for isolated desktop sessions, driver routing, evidence, visual QA, and live observer coordination.",
   "license": "Apache-2.0",
   "type": "module",

@@ -307,7 +307,7 @@ export class RawMcpClient {
       capabilities: {},
       clientInfo: {
         name: "agent-desktop-harness-smoke",
-        version: "0.0.0",
+        version: "0.2.0",
       },
     });
     await this.notify("notifications/initialized");

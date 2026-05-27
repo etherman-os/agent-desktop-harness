@@ -1,6 +1,6 @@
 {
   "name": "@agent-desktop-harness/mcp-server",
-  "version": "0.0.0",
+  "version": "0.2.0",
   "description": "MCP stdio server adapter for agent-desktop-harness.",
   "license": "Apache-2.0",
   "type": "module",

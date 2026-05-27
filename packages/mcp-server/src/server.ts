@@ -68,7 +68,7 @@ export interface CreateServerOptions {
 export function createDesktopHarnessMcpServer(options: CreateServerOptions = {}): McpServer {
   const server = new McpServer({
     name: "agent-desktop-harness",
-    version: "0.0.0",
+    version: "0.2.0",
   });
   const sessionManager = options.sessionManager ?? new SessionManager();
   const handlers = new DesktopMcpToolHandlers(sessionManager, options.defaultWorkspaceDir);

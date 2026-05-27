@@ -4,7 +4,7 @@ Thanks for helping improve Agent Desktop Harness.
 
 ## Project Scope
 
-This project is a Linux-first GUI QA and visual handoff harness for coding agents. The v0.1 scope is isolated Xvfb sessions, screenshots, input actions, window control, evidence artifacts, HTTP, MCP, CLI smoke workflows, and Visual Annotation Handoff.
+This project is a Linux-first GUI QA and visual handoff harness for coding agents. The v0.2 scope is isolated Xvfb sessions, screenshots, input actions, window control, evidence artifacts, HTTP, MCP, CLI smoke workflows, and Visual Annotation Handoff.
 
 Please avoid adding real-desktop control as default behavior. Real desktop control has a different risk profile and is intentionally outside the v0.1 default path.
 

@@ -486,7 +486,7 @@ test("DesktopMcpToolHandlers rejects invalid annotation screenshot paths", async
 test("registerDesktopHarnessTools registers all expected tool names", () => {
   const server = new McpServer({
     name: "test",
-    version: "0.0.0",
+    version: "0.2.0",
   });
   registerDesktopHarnessTools(server, new DesktopMcpToolHandlers(new MockSessionManager()));
 
